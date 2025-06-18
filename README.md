@@ -15,6 +15,7 @@ docker run -d \
 ```bash
 composer require inspector-apm/neuron-ai
 composer require smalot/pdfparser
+composer require spatie/pdf-to-text
 composer require phpoffice/phppresentation
 composer require phpoffice/phpword  
 composer require thiagoalessio/tesseract_ocr
@@ -23,6 +24,10 @@ composer require thiagoalessio/tesseract_ocr
 # System dependencies
 ## For OCR
 sudo apt install tesseract-ocr
+
+## For PDF
+sudo apt install poppler-utils
+
 
 ## For video/audio processing
 sudo apt install ffmpeg

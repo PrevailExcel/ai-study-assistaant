@@ -6,11 +6,12 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use thiagoalessio\TesseractOCR\TesseractOCR;
 use Smalot\PdfParser\Parser;
+use Spatie\PdfToText\Pdf;
 
 class MultimediaPdfProcessor
 {
     private ChromaService $chromaService;
-    
+
     public function __construct(ChromaService $chromaService)
     {
         $this->chromaService = $chromaService;
@@ -30,27 +31,43 @@ class MultimediaPdfProcessor
 
         // 1. Extract regular text
         $textContent = $this->extractTextFromPdf($pdfPath);
-        $results['text_chunks'] = $this->chunkText($textContent);
+        $cleanText = trim($textContent);
 
-        // 2. Extract images from PDF
-        $images = $this->extractImagesFromPdf($pdfPath);
-        
-        foreach ($images as $index => $imagePath) {
-            // OCR for text in images
-            $ocrText = $this->performOCR($imagePath);
-            if (!empty($ocrText)) {
-                $results['ocr_text'][] = [
+        // Check if extracted text seems valid
+        $shouldFallbackToImage = strlen($cleanText) < 500 || $this->isMostlyNonReadable($cleanText);
+
+        if (!$shouldFallbackToImage) {
+            // Use extracted text
+            $results['text_chunks'] = $this->chunkText($cleanText);
+        } else {
+            logger()->warning("Extracted text seems insufficient, falling back to OCR + Image Analysis.");
+            $cleanText = ''; // optionally discard it
+
+
+            // 2. Extract images from PDF
+            $images = $this->extractImagesFromPdf($pdfPath);
+
+            foreach ($images as $index => $imagePath) {
+                // OCR for text in images
+                $ocrText = $this->performOCR($imagePath);
+                if (!empty($ocrText)) {
+                    $results['ocr_text'][] = [
+                        'image_index' => $index,
+                        'text' => $ocrText
+                    ];
+                }
+
+                // Visual analysis with Claude
+                $imageDescription = $this->analyzeImageWithClaude($imagePath);
+                $results['image_descriptions'][] = [
                     'image_index' => $index,
-                    'text' => $ocrText
+                    'description' => $imageDescription
                 ];
             }
-
-            // Visual analysis with Claude
-            $imageDescription = $this->analyzeImageWithClaude($imagePath);
-            $results['image_descriptions'][] = [
-                'image_index' => $index,
-                'description' => $imageDescription
-            ];
+            logger()->info("Image analysis results", [
+                'image_descriptions' => $results['image_descriptions'],
+                'ocr_text' => $results['ocr_text']
+            ]);
         }
 
         // 3. Combine all content for comprehensive chunks
@@ -61,6 +78,7 @@ class MultimediaPdfProcessor
 
     private function extractImagesFromPdf(string $pdfPath): array
     {
+        logger()->info("Extracting images from PDF: {$pdfPath}");
         // Using ImageMagick or similar to extract images
         $outputDir = storage_path('app/temp/pdf_images/');
         if (!file_exists($outputDir)) {
@@ -73,6 +91,9 @@ class MultimediaPdfProcessor
 
         // Get extracted image files
         $images = glob($outputDir . '*.jpg');
+
+        logger()->info("Extracted images", ['count' => count($images)]);
+        logger()->info('Images', $images);
         return $images;
     }
 
@@ -136,36 +157,35 @@ class MultimediaPdfProcessor
     private function createCombinedChunks(array $results): array
     {
         $combinedChunks = [];
-        
+
         // Interleave text chunks with image content
         $textChunks = $results['text_chunks'];
         $imageDescriptions = $results['image_descriptions'];
         $ocrTexts = $results['ocr_text'];
-        
+
         foreach ($textChunks as $index => $textChunk) {
             $combined = $textChunk;
-            
+
             // Add related image descriptions
             if (isset($imageDescriptions[$index])) {
                 $combined .= "\n\n[IMAGE DESCRIPTION]: " . $imageDescriptions[$index]['description'];
             }
-            
+
             // Add OCR text from images
             if (isset($ocrTexts[$index]) && !empty($ocrTexts[$index]['text'])) {
                 $combined .= "\n\n[TEXT FROM IMAGE]: " . $ocrTexts[$index]['text'];
             }
-            
+
             $combinedChunks[] = $combined;
         }
-        
+
         return $combinedChunks;
     }
 
     private function extractTextFromPdf(string $pdfPath): string
     {
-        $parser = new Parser();
-        $pdf = $parser->parseFile($pdfPath);
-        return $pdf->getText();
+        $text = Pdf::getText($pdfPath);
+        return $text;
     }
 
     private function chunkText(string $text, int $chunkSize = 1000): array
@@ -173,12 +193,25 @@ class MultimediaPdfProcessor
         // Same chunking logic as before
         $chunks = [];
         $textLength = strlen($text);
-        
+
         for ($i = 0; $i < $textLength; $i += $chunkSize) {
             $chunk = substr($text, $i, $chunkSize);
             $chunks[] = trim($chunk);
         }
-        
+
         return array_filter($chunks);
+    }
+
+    private function isMostlyNonReadable(string $text): bool
+    {
+        // Check proportion of alphabetic characters
+        $total = strlen($text);
+        if ($total === 0) return true;
+
+        $alphaCount = preg_match_all('/[a-zA-Z]/', $text);
+        $nonReadableRatio = ($total - $alphaCount) / $total;
+
+        // If more than 50% of text is non-alphabetic, consider it non-readable
+        return $nonReadableRatio > 0.5;
     }
 }

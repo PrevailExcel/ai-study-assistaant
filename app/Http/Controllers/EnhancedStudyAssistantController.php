@@ -27,7 +27,7 @@ class EnhancedStudyAssistantController extends Controller
     /**
      * Upload and process various file types
      */
-    public function uploadFile(Request $request): JsonResponse
+    public function uploadFile(Request $request)//: JsonResponse
     {
         $validator = Validator::make($request->all(), [
             'file' => 'required|file|max:51200', // 50MB max
@@ -48,7 +48,7 @@ class EnhancedStudyAssistantController extends Controller
             
             // Store the file
             $filePath = $uploadedFile->store('uploads');
-            $fullPath = storage_path('app/' . $filePath);
+            $fullPath = storage_path('app/private/' . $filePath);
             
             // Process the file based on type
             $processedContent = $this->fileProcessor->processFile($fullPath, $fileType);
@@ -339,15 +339,22 @@ class EnhancedStudyAssistantController extends Controller
     }
 
     // Private helper methods
-
     private function storeInVectorDB(string $documentId, array $processedContent, array $baseMetadata): bool
     {
         $documents = [];
         $metadatas = [];
         $ids = [];
-        
-        // Handle different content types
-        if (isset($processedContent['combined_content'])) {
+    
+        // Track counts for logging
+        $logCounts = [
+            'combined' => 0,
+            'text' => 0,
+            'image_description' => 0,
+            'transcript' => 0
+        ];
+    
+        // 1. Store combined content chunks
+        if (!empty($processedContent['combined_content'])) {
             foreach ($processedContent['combined_content'] as $index => $content) {
                 $documents[] = $content;
                 $metadatas[] = array_merge($baseMetadata, [
@@ -356,11 +363,12 @@ class EnhancedStudyAssistantController extends Controller
                     'content_type' => 'combined'
                 ]);
                 $ids[] = $documentId . '_chunk_' . $index;
+                $logCounts['combined']++;
             }
         }
-        
-        // Store text content separately
-        if (isset($processedContent['text_chunks'])) {
+    
+        // 2. Optional: store raw text chunks separately if needed
+        if (!empty($processedContent['text_chunks'])) {
             foreach ($processedContent['text_chunks'] as $index => $chunk) {
                 $documents[] = $chunk;
                 $metadatas[] = array_merge($baseMetadata, [
@@ -369,23 +377,27 @@ class EnhancedStudyAssistantController extends Controller
                     'content_type' => 'text'
                 ]);
                 $ids[] = $documentId . '_text_' . $index;
+                $logCounts['text']++;
             }
         }
-        
-        // Store image descriptions
-        if (isset($processedContent['image_descriptions'])) {
-            foreach ($processedContent['image_descriptions'] as $index => $description) {
-                $documents[] = $description;
-                $metadatas[] = array_merge($baseMetadata, [
-                    'document_id' => $documentId,
-                    'chunk_index' => $index,
-                    'content_type' => 'image_description'
-                ]);
-                $ids[] = $documentId . '_img_' . $index;
+    
+        // 3. Store image descriptions
+        if (!empty($processedContent['image_descriptions'])) {
+            foreach ($processedContent['image_descriptions'] as $index => $desc) {
+                if (!empty($desc['description'])) {
+                    $documents[] = $desc['description'];
+                    $metadatas[] = array_merge($baseMetadata, [
+                        'document_id' => $documentId,
+                        'chunk_index' => $index,
+                        'content_type' => 'image_description'
+                    ]);
+                    $ids[] = $documentId . '_imgdesc_' . $index;
+                    $logCounts['image_description']++;
+                }
             }
         }
-        
-        // Store transcripts
+    
+        // 4. Store transcript if available
         if (isset($processedContent['transcript']) || isset($processedContent['audio_transcript'])) {
             $transcript = $processedContent['transcript'] ?? $processedContent['audio_transcript'];
             $documents[] = $transcript;
@@ -395,10 +407,14 @@ class EnhancedStudyAssistantController extends Controller
                 'content_type' => 'transcript'
             ]);
             $ids[] = $documentId . '_transcript';
+            $logCounts['transcript']++;
         }
-        
+    
+        logger()->info("📥 Preparing to store to vector DB", $logCounts);
+    
         return $this->chromaService->addDocuments($documents, $metadatas, $ids);
     }
+    
 
     private function getRelevantContent(string $documentId, string $topic, bool $includeVisual): array
     {

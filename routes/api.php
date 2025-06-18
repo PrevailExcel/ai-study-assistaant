@@ -9,7 +9,7 @@ Route::get('/user', function (Request $request) {
 })->middleware('auth:sanctum');
 
 
-Route::prefix('study')->group(function () {
+Route::prefix('v1/study')->group(function () {
     
     // File upload and processing
     Route::post('/upload', [EnhancedStudyAssistantController::class, 'uploadFile'])

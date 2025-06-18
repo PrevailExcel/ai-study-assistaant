@@ -14,6 +14,7 @@
         "phpoffice/phppresentation": "^1.1",
         "phpoffice/phpword": "^1.4",
         "smalot/pdfparser": "^2.12",
+        "spatie/pdf-to-text": "^1.54",
         "thiagoalessio/tesseract_ocr": "^2.13"
     },
     "require-dev": {
