@@ -91,4 +91,32 @@ class AuthController extends Controller
             return $this->error($e->getMessage());
         }
     }
+
+    public function login(Request $request)
+    {
+        // Validate the request data
+        $validator = Validator::make($request->all(), [
+            'email' => 'required|string|email|max:255',
+            'password' => 'required|string|min:8',
+        ]);
+        if ($validator->fails()) {
+            return $this->error($validator->errors(), 422);
+        }
+
+        // Attempt to log the user in
+        if (Auth::attempt($request->only('email', 'password'))) {
+
+            $user = User::where('email', $request->email)->first();
+            $token = $user->createToken('access-token')->plainTextToken;
+            $userinfo = [
+                'token' => $token,
+                'user' => $user->only('name', 'email', 'id', 'code'),
+                'plan' =>  $user->plan(),
+            ];
+
+            return $this->success($userinfo, 'User logged in successfully');
+        }
+
+        return $this->error('Invalid credentials', 401);
+    }
 }

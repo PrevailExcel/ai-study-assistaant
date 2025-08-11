@@ -16,6 +16,8 @@ Route::prefix('v1')->group(function () {
         ->name('auth.register');
     Route::post('/register-third-party', [AuthController::class, 'registerWithThirdParty'])
         ->name('auth.register.third-party');
+    Route::post('/login', [AuthController::class, 'login']);
+
 
     Route::middleware('auth:sanctum')->prefix('study')->group(function () {
 
