@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\EnhancedStudyAssistantController;
+use App\Http\Controllers\PasswordResetController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -17,6 +18,8 @@ Route::prefix('v1')->group(function () {
     Route::post('/register-third-party', [AuthController::class, 'registerWithThirdParty'])
         ->name('auth.register.third-party');
     Route::post('/login', [AuthController::class, 'login']);
+    Route::post('/forgot-password', [PasswordResetController::class, 'sendCode']);
+    Route::post('/reset-password', [PasswordResetController::class, 'resetPassword']);
 
 
     Route::middleware('auth:sanctum')->prefix('study')->group(function () {
