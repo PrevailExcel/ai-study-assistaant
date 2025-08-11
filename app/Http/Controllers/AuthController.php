@@ -50,7 +50,7 @@ class AuthController extends Controller
     {
         $encodedResponse = json_encode($request->json()->all());
         $decodedResponse = json_decode($encodedResponse, true);
-        $projectId = env('FIREBASE_PROJECT_ID', "iquest-unizik-b1ab7");
+        $projectId = env('FIREBASE_PROJECT_ID');
         $verifier = IdTokenVerifier::createWithProjectId($projectId);
         $idToken = $decodedResponse['token'];
 

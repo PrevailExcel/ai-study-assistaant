@@ -19,7 +19,7 @@ class SendPushNotifications
         $body = "We can't wait for you to start using iQuest and seeing your excellent results. \nAs always, our support team can be reached by replying this mail if you ever get stuck. \n Have a great day!";
 
         // Send the Firebase Notification
-        $SERVER_API_KEY = env('FIREBASE_SERVER_KEY', "AAAAMuzDsj0:APA91bFDdY6sHd_3FfiFPrYlXTKL22wPyoIRB6rhlVrEA_ye7Zrjv6yA-Cm_7wSl2CKZeWqEOIyxyaYVOAMMOb6JOrmT5SHyudCWdTQHgrLMG5Z5ZvDYeooFzjudKn2_4PkkFeHmYz3G");
+        $SERVER_API_KEY = env('FIREBASE_SERVER_KEY');
         $firedata = [
             "registration_ids" => [$data['notification_id']],
             "notification" => [
@@ -61,7 +61,7 @@ class SendPushNotifications
         $body = "We can't wait for you to start using iQuest and seeing your excellent results. \nAs always, our support team can be reached by replying this mail if you ever get stuck. \n Have a great day!";
 
         // Send the Firebase Notification
-        $SERVER_API_KEY = env('FIREBASE_SERVER_KEY', "AAAAMuzDsj0:APA91bFDdY6sHd_3FfiFPrYlXTKL22wPyoIRB6rhlVrEA_ye7Zrjv6yA-Cm_7wSl2CKZeWqEOIyxyaYVOAMMOb6JOrmT5SHyudCWdTQHgrLMG5Z5ZvDYeooFzjudKn2_4PkkFeHmYz3G");
+        $SERVER_API_KEY = env('FIREBASE_SERVER_KEY');
         $firedata = [
             "registration_ids" => [$data['notification_id']],
             "notification" => [
@@ -104,7 +104,7 @@ class SendPushNotifications
 
 
         // Send the Firebase Notification
-        $SERVER_API_KEY = env('FIREBASE_SERVER_KEY', "AAAAMuzDsj0:APA91bFDdY6sHd_3FfiFPrYlXTKL22wPyoIRB6rhlVrEA_ye7Zrjv6yA-Cm_7wSl2CKZeWqEOIyxyaYVOAMMOb6JOrmT5SHyudCWdTQHgrLMG5Z5ZvDYeooFzjudKn2_4PkkFeHmYz3G");
+        $SERVER_API_KEY = env('FIREBASE_SERVER_KEY');
         $firedata = [
             "registration_ids" => [$data['notification_id']],
             "notification" => [
@@ -147,7 +147,7 @@ class SendPushNotifications
 
 
         // Send the Firebase Notification
-        $SERVER_API_KEY = env('FIREBASE_SERVER_KEY', "AAAAMuzDsj0:APA91bFDdY6sHd_3FfiFPrYlXTKL22wPyoIRB6rhlVrEA_ye7Zrjv6yA-Cm_7wSl2CKZeWqEOIyxyaYVOAMMOb6JOrmT5SHyudCWdTQHgrLMG5Z5ZvDYeooFzjudKn2_4PkkFeHmYz3G");
+        $SERVER_API_KEY = env('FIREBASE_SERVER_KEY');
         $firedata = [
             "registration_ids" => [$data['notification_id']],
             "notification" => [
@@ -190,7 +190,7 @@ class SendPushNotifications
 
 
         // Send the Firebase Notification
-        $SERVER_API_KEY = env('FIREBASE_SERVER_KEY', "AAAAMuzDsj0:APA91bFDdY6sHd_3FfiFPrYlXTKL22wPyoIRB6rhlVrEA_ye7Zrjv6yA-Cm_7wSl2CKZeWqEOIyxyaYVOAMMOb6JOrmT5SHyudCWdTQHgrLMG5Z5ZvDYeooFzjudKn2_4PkkFeHmYz3G");
+        $SERVER_API_KEY = env('FIREBASE_SERVER_KEY');
         $firedata = [
             "registration_ids" => [$data['notification_id']],
             "notification" => [
@@ -232,7 +232,7 @@ class SendPushNotifications
         $body = $details['body'];
 
         // Send the Firebase Notification
-        $SERVER_API_KEY = env('FIREBASE_SERVER_KEY', "AAAAMuzDsj0:APA91bFDdY6sHd_3FfiFPrYlXTKL22wPyoIRB6rhlVrEA_ye7Zrjv6yA-Cm_7wSl2CKZeWqEOIyxyaYVOAMMOb6JOrmT5SHyudCWdTQHgrLMG5Z5ZvDYeooFzjudKn2_4PkkFeHmYz3G");
+        $SERVER_API_KEY = env('FIREBASE_SERVER_KEY');
         $firedata = [
             "registration_ids" => $ids,
             "notification" => [
