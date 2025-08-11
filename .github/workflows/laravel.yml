@@ -1,0 +1,44 @@
+name: Deploy to Droplet
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v3
+
+    - name: Set up PHP
+      uses: shivammathur/setup-php@v2
+      with:
+        php-version: '8.2'
+        extensions: sockets, mbstring, pdo, pdo_mysql
+
+    - name: Install Composer dependencies
+      run: |
+        curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
+        composer install --optimize-autoloader
+    - name: Install sshpass
+      run: sudo apt-get install -y sshpass
+
+    - name: Copy Files to Droplet
+      run: |
+        sshpass -p "${{ secrets.DROPLET_PASSWORD }}"  rsync -avz -e "ssh -o StrictHostKeyChecking=no" ./ root@173.249.12.165:/var/www/html/aiquest
+    
+    - name: Grant permissions
+      run: |
+              sshpass -p "${{ secrets.DROPLET_PASSWORD }}" ssh -T -o StrictHostKeyChecking=no root@173.249.12.165 << 'EOF'
+                cd /var/www/html/aiquest
+      
+                chown -R www-data:www-data storage bootstrap/cache
+                chmod -R 775 storage bootstrap/cache
+      
+                php artisan optimize:clear
+                php artisan migrate
+              EOF
