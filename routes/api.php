@@ -3,6 +3,7 @@
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\EnhancedStudyAssistantController;
 use App\Http\Controllers\PasswordResetController;
+use App\Http\Controllers\SubscriptionController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -20,6 +21,8 @@ Route::prefix('v1')->group(function () {
     Route::post('/login', [AuthController::class, 'login']);
     Route::post('/forgot-password', [PasswordResetController::class, 'sendCode']);
     Route::post('/reset-password', [PasswordResetController::class, 'resetPassword']);
+    Route::get('/plans', [SubscriptionController::class, 'listPlans']);
+    Route::post('/subscribe', [SubscriptionController::class, 'subscribe']);
 
 
     Route::middleware('auth:sanctum')->prefix('study')->group(function () {
