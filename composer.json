@@ -8,11 +8,13 @@
     "require": {
         "php": "^8.2",
         "inspector-apm/neuron-ai": "^1.12",
+        "kreait/firebase-tokens": "^5.2",
         "laravel/framework": "^12.0",
         "laravel/sanctum": "^4.0",
         "laravel/tinker": "^2.10.1",
         "phpoffice/phppresentation": "^1.1",
         "phpoffice/phpword": "^1.4",
+        "prevailexcel/laravel-action-service-trait": "^1.0",
         "smalot/pdfparser": "^2.12",
         "spatie/pdf-to-text": "^1.54",
         "thiagoalessio/tesseract_ocr": "^2.13"
