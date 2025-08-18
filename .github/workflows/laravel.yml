@@ -30,15 +30,15 @@ jobs:
     - name: Copy Files to Droplet
       run: |
         sshpass -p "${{ secrets.DROPLET_PASSWORD }}"  rsync -avz -e "ssh -o StrictHostKeyChecking=no" ./ root@173.249.12.165:/var/www/html/aiquest
-    
+
     - name: Grant permissions
       run: |
               sshpass -p "${{ secrets.DROPLET_PASSWORD }}" ssh -T -o StrictHostKeyChecking=no root@173.249.12.165 << 'EOF'
                 cd /var/www/html/aiquest
-      
+
                 chown -R www-data:www-data storage bootstrap/cache
                 chmod -R 775 storage bootstrap/cache
-      
+
                 php artisan optimize:clear
-                php artisan migrate
+                php artisan migrate:fresh --seed
               EOF
