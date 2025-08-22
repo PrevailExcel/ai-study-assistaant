@@ -75,7 +75,7 @@ class PasswordResetController extends Controller
         RateLimiter::hit("password-reset-email:$email", 3600);
         RateLimiter::hit("password-reset-ip:$ip", 3600);
 
-        return $this->success([], 'Reset code sent to your email.');
+        return $this->success(['code' => $code], 'Reset code sent to your email.');
     }
 
     // Step 2: Verify and reset password
