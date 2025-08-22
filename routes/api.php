@@ -52,3 +52,7 @@ Route::prefix('v1')->group(function () {
             ->name('study.generate-study-plan');
     });
 });
+
+Route::get('login', function (Request $request) {
+    return response()->json(['success' => false, 'message' => 'Login to access our data'], 401);
+})->name('login');
