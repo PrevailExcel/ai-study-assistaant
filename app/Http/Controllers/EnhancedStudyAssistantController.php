@@ -58,6 +58,13 @@ class EnhancedStudyAssistantController extends Controller
             // Generate document ID
             $documentId = uniqid('doc_');
 
+            logger()->info("📁 File uploaded and processed", [
+                'document_id' => $documentId,
+                'file_type' => $fileType,
+                'file_path' => $filePath,
+                'processed_content_summary' => $this->generateContentSummary($processedContent)
+            ]);
+
             // Store in ChromaDB
             $success = $this->storeInVectorDB($documentId, $processedContent, [
                 'filename' => $uploadedFile->getClientOriginalName(),
@@ -66,7 +73,7 @@ class EnhancedStudyAssistantController extends Controller
             ]);
 
             if (!$success) {
-                return response()->json(['error' => 'Failed to store processed content'], 500);
+                return $this->error('Failed to store processed content', 500);
             }
 
             // Clean up temporary files
@@ -501,7 +508,7 @@ class EnhancedStudyAssistantController extends Controller
 
         $typeStr = implode(', ', $types);
 
-        $prompt = "Based on the following study material, generate {$count} questions at {$difficulty} difficulty level. Include these question types: {$typeStr}. 
+        $prompt = "Based on the following study material, generate {$count} questions at {$difficulty} difficulty level. Include these question types: {$typeStr}.
 
 For multiple choice questions, provide 4 options with one correct answer.
 Format the response as a JSON array with objects containing: 'question', 'type', 'options' (for multiple choice), 'correct_answer', 'explanation'.
@@ -521,7 +528,7 @@ Study Material:
             'types' => $types,
             'questions' => $questions
         ]);
-        
+
         return $questions;
     }
 
