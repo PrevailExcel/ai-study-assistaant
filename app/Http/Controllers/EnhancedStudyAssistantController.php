@@ -84,7 +84,7 @@ class EnhancedStudyAssistantController extends Controller
             $this->cleanupTempFiles();
 
             // save in the database
-           $document = Document::create([
+            $document = Document::create([
                 'title' => $request->name ?? pathinfo($uploadedFile->getClientOriginalName(), PATHINFO_FILENAME),
                 'doc_id' => $documentId,
                 'file_path' => $filePath,
@@ -113,19 +113,27 @@ class EnhancedStudyAssistantController extends Controller
         }
     }
 
+    /**
+     * List documents uploaded by the user
+     */
     public function listDocuments(Request $request): JsonResponse
     {
         try {
-            $documents = Document::where('user_id', $request->user()->id)->get();
+            $perPage = (int) $request->input('per_page', 10); // default = 10
+            $perPage = $perPage > 100 ? 100 : $perPage; // prevent abuse by limiting max
+
+            $documents = Document::where('user_id', $request->user()->id)
+                ->simplePaginate($perPage);
 
             return $this->success(['documents' => $documents]);
         } catch (\Exception $e) {
             return $this->error(
-                'Failed to retrieve documents' . $e->getMessage(),
+                'Failed to retrieve documents. ' . $e->getMessage(),
                 500
             );
         }
     }
+
 
     public function nameDocument(Request $request, string $documentId): JsonResponse
     {
@@ -157,8 +165,10 @@ class EnhancedStudyAssistantController extends Controller
                 'new_name' => $document->title
             ]);
         } catch (\Exception $e) {
-            return $this->error('Failed to rename document: ' . $e->getMessage()
-            , 500);
+            return $this->error(
+                'Failed to rename document: ' . $e->getMessage(),
+                500
+            );
         }
     }
 

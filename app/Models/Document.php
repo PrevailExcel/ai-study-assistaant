@@ -21,6 +21,16 @@ class Document extends Model
 
     protected $casts = [
         'metadata' => 'array',
+        'created_at' => 'datetime:Y-m-d H:i:s',
+    ];
+
+    public function getFilePathAttribute($value)
+    {
+        return url($value);
+    }
+
+    protected $hidden = [
+        'updated_at',
     ];
 
     public $incrementing = false;
