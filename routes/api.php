@@ -31,6 +31,13 @@ Route::prefix('v1')->group(function () {
         Route::post('/upload', [EnhancedStudyAssistantController::class, 'uploadFile'])
             ->name('study.upload');
 
+        // List documents
+        Route::get('/documents', [EnhancedStudyAssistantController::class, 'listDocuments']);
+
+        //Name document
+        Route::post('/document/{documentId}/name', [EnhancedStudyAssistantController::class, 'nameDocument'])
+            ->name('study.name-document');
+
         // Question generation
         Route::post('/generate-questions', [EnhancedStudyAssistantController::class, 'generateQuestions'])
             ->name('study.generate-questions');

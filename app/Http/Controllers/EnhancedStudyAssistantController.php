@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Agents\QuestionGeneratorAgent;
+use App\Models\Document;
 use App\Services\ChromaService;
 use App\Services\MultimediaFileProcessor;
 use Illuminate\Http\Request;
@@ -35,7 +36,8 @@ class EnhancedStudyAssistantController extends Controller
     {
         $validator = Validator::make($request->all(), [
             'file' => 'required|file|max:51200', // 50MB max
-            'file_type' => 'sometimes|string|in:pdf,pptx,ppt,docx,doc,mp4,mov,avi,mp3,wav'
+            'file_type' => 'sometimes|string|in:pdf,pptx,ppt,docx,doc,mp4,mov,avi,mp3,wav',
+            'name' => 'sometimes|string|max:255'
         ]);
 
         if ($validator->fails()) {
@@ -81,6 +83,20 @@ class EnhancedStudyAssistantController extends Controller
             // Clean up temporary files
             $this->cleanupTempFiles();
 
+            // save in the database
+            Document::create([
+                'title' => $request->name ?? pathinfo($uploadedFile->getClientOriginalName(), PATHINFO_FILENAME),
+                'doc_id' => $documentId,
+                'file_path' => $filePath,
+                'file_type' => $fileType,
+                'user_id' => $request->user()->id,
+                'metadata' => [
+                    'original_name' => $uploadedFile->getClientOriginalName(),
+                    'size' => $uploadedFile->getSize(),
+                    'mime_type' => $uploadedFile->getMimeType()
+                ]
+            ]);
+
             return response()->json([
                 'success' => true,
                 'document_id' => $documentId,
@@ -93,6 +109,55 @@ class EnhancedStudyAssistantController extends Controller
                 'error' => 'File processing failed',
                 'message' => $e->getMessage()
             ], 500);
+        }
+    }
+
+    public function listDocuments(Request $request): JsonResponse
+    {
+        try {
+            $documents = Document::where('user_id', $request->user()->id)->get();
+
+            return $this->success(['documents' => $documents]);
+        } catch (\Exception $e) {
+            return $this->error(
+                'Failed to retrieve documents' . $e->getMessage(),
+                500
+            );
+        }
+    }
+
+    public function nameDocument(Request $request, string $documentId): JsonResponse
+    {
+        $validator = Validator::make($request->all(), [
+            'name' => 'required|string|max:255'
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'error' => 'Validation failed',
+                'details' => $validator->errors()
+            ], 422);
+        }
+
+        try {
+            $document = Document::where('doc_id', $documentId)
+                ->where('user_id', $request->user()->id)
+                ->first();
+
+            if (!$document) {
+                return response()->json(['error' => 'Document not found'], 404);
+            }
+
+            $document->title = $request->input('name');
+            $document->save();
+
+            return $this->success([
+                'document_id' => $documentId,
+                'new_name' => $document->title
+            ]);
+        } catch (\Exception $e) {
+            return $this->error('Failed to rename document: ' . $e->getMessage()
+            , 500);
         }
     }
 
