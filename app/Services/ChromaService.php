@@ -32,17 +32,20 @@ class ChromaService
     public function createDatabase(): bool
     {
         try {
+            $url = "{$this->baseUrl}/api/v2/tenants/{$this->tenant}/databases/{$this->database}";
 
-            // Check if the collection already exists
-            $checkResponse = Http::get("$this->baseUrl}/api/v2/tenants/{$this->tenant}/databases/$this->database");
-    
+            // Check if database exists
+            $checkResponse = Http::get($url);
+
             if ($checkResponse->successful()) {
-                logger()->info('ChromaDB dataabase already exists', [
+                logger()->info('ChromaDB database already exists', [
                     'database' => $this->database,
+                    'data' => $checkResponse->json(),
                 ]);
                 return true;
             }
 
+            // Try creating the database
             $response = Http::post("{$this->baseUrl}/api/v2/tenants/{$this->tenant}/databases", [
                 'name' => $this->database,
             ]);
@@ -66,32 +69,36 @@ class ChromaService
             return false;
         }
     }
+
     public function initializeCollection(): bool
     {
         try {
-            // Check if the collection already exists
-            $checkResponse = Http::get($this->url("collections/{$this->collectionName}"));
-    
+            $url = $this->url("collections/{$this->collectionName}");
+
+            // Check if collection exists
+            $checkResponse = Http::get($url);
+
             if ($checkResponse->successful()) {
+                $data = $checkResponse->json();
                 logger()->info('ChromaDB collection already exists', [
                     'collection' => $this->collectionName,
-                    'data' => $checkResponse->json(),
+                    'data' => $data,
                 ]);
-                $this->collectionID = $checkResponse->json()['id'];
+                $this->collectionID = $data['id'];
                 return true;
             }
-    
-            // Try creating the collection
+
+            // Create collection
             $response = Http::post($this->url('collections'), [
                 'name' => $this->collectionName,
                 'metadata' => ['description' => 'Study materials collection']
             ]);
-    
+
             logger()->info('Initializing ChromaDB collection', [
                 'collection' => $this->collectionName,
                 'response_status' => $response->status()
             ]);
-    
+
             if ($response->failed()) {
                 Log::error('Failed to initialize ChromaDB collection', [
                     'status' => $response->status(),
@@ -99,18 +106,25 @@ class ChromaService
                 ]);
                 return false;
             }
-    
+
+            // ✅ Save the collection ID after creation
+            $data = $response->json();
+            if (isset($data['id'])) {
+                $this->collectionID = $data['id'];
+            }
+
             logger()->info('ChromaDB collection initialized successfully', [
-                'collection' => $this->collectionName
+                'collection' => $this->collectionName,
+                'collection_id' => $this->collectionID
             ]);
-    
+
             return true;
         } catch (\Exception $e) {
             Log::error('ChromaDB collection initialization failed: ' . $e->getMessage());
             return false;
         }
     }
-    
+
 
     public function addDocuments(array $documents, array $metadatas = [], array $ids = []): bool
     {

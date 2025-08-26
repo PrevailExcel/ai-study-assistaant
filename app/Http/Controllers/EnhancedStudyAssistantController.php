@@ -23,7 +23,9 @@ class EnhancedStudyAssistantController extends Controller
         $this->fileProcessor = $fileProcessor;
 
         // Initialize ChromaDB collection
-        $this->chromaService->initializeCollection();
+        if ($this->chromaService->createDatabase()) {
+            $this->chromaService->initializeCollection();
+        }
     }
 
     /**
