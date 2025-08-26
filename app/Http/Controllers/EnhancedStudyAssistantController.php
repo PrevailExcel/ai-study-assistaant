@@ -84,7 +84,7 @@ class EnhancedStudyAssistantController extends Controller
             $this->cleanupTempFiles();
 
             // save in the database
-            Document::create([
+           $document = Document::create([
                 'title' => $request->name ?? pathinfo($uploadedFile->getClientOriginalName(), PATHINFO_FILENAME),
                 'doc_id' => $documentId,
                 'file_path' => $filePath,
@@ -102,7 +102,8 @@ class EnhancedStudyAssistantController extends Controller
                 'document_id' => $documentId,
                 'file_type' => $fileType,
                 'content_summary' => $this->generateContentSummary($processedContent),
-                'processing_stats' => $this->getProcessingStats($processedContent)
+                'processing_stats' => $this->getProcessingStats($processedContent),
+                'document' => $document
             ]);
         } catch (\Exception $e) {
             return response()->json([
@@ -140,7 +141,7 @@ class EnhancedStudyAssistantController extends Controller
         }
 
         try {
-            $document = Document::where('doc_id', $documentId)
+            $document = Document::where('id', $documentId)
                 ->where('user_id', $request->user()->id)
                 ->first();
 
