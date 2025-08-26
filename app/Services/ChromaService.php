@@ -310,8 +310,10 @@ class ChromaService
     private function generateSentenceTransformerEmbeddings(array $texts): array
     {
         $localServiceUrl = config('chroma.local_embedding_url', 'http://localhost:8001');
+        $batchSize = 3; // ✅ keep batches small (adjust based on service capability)
+        $embeddings = [];
 
-        // First check if service is healthy
+        // Health check
         try {
             $healthResponse = Http::timeout(5)->get($localServiceUrl . '/health');
             if (!$healthResponse->successful()) {
@@ -328,49 +330,50 @@ class ChromaService
             return [];
         }
 
-        try {
-            Log::info('Generating embeddings locally', [
-                'texts_count' => count($texts),
-                'service_url' => $localServiceUrl
-            ]);
-
-            $response = Http::timeout(60) // Longer timeout for batch processing
-                ->retry(3, 1000) // Retry 3 times with 1 second delay
-                ->post($localServiceUrl . '/embed', [
-                    'texts' => $texts
+        // Process in chunks
+        foreach (array_chunk($texts, $batchSize) as $chunk) {
+            try {
+                Log::info('Generating embeddings locally (batch)', [
+                    'batch_size' => count($chunk),
+                    'service_url' => $localServiceUrl
                 ]);
 
-            if ($response->successful()) {
-                $data = $response->json();
-
-                if (isset($data['embeddings']) && is_array($data['embeddings'])) {
-                    Log::info('Local embeddings generated successfully', [
-                        'count' => $data['count'] ?? count($data['embeddings']),
-                        'dimension' => $data['dimension'] ?? 'unknown'
+                $response = Http::timeout(60)
+                    ->retry(3, 1000)
+                    ->post($localServiceUrl . '/embed', [
+                        'texts' => $chunk
                     ]);
 
-                    return $data['embeddings'];
+                if ($response->successful()) {
+                    $data = $response->json();
+
+                    if (isset($data['embeddings']) && is_array($data['embeddings'])) {
+                        $embeddings = array_merge($embeddings, $data['embeddings']);
+                    } else {
+                        Log::error('Invalid response format from local embedding service', [
+                            'response' => $data
+                        ]);
+                        return [];
+                    }
                 } else {
-                    Log::error('Invalid response format from local embedding service', [
-                        'response' => $data
+                    Log::error('Local embedding service request failed', [
+                        'status' => $response->status(),
+                        'response' => $response->body()
                     ]);
                     return [];
                 }
-            } else {
-                Log::error('Local embedding service request failed', [
-                    'status' => $response->status(),
-                    'response' => $response->body()
+            } catch (\Exception $e) {
+                Log::error('Local embedding service error: ' . $e->getMessage(), [
+                    'url' => $localServiceUrl,
+                    'batch_size' => count($chunk)
                 ]);
                 return [];
             }
-        } catch (\Exception $e) {
-            Log::error('Local embedding service error: ' . $e->getMessage(), [
-                'url' => $localServiceUrl,
-                'texts_count' => count($texts)
-            ]);
-            return [];
         }
+
+        return $embeddings;
     }
+
 
     /**
      * Option 3: Use Ollama embeddings (completely free and local)
