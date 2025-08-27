@@ -16,7 +16,7 @@ Route::prefix('v1')->group(function () {
 
     Route::post('/register', [AuthController::class, 'register'])
         ->name('auth.register');
-    Route::post('/register-third-party', [AuthController::class, 'registerWithThirdParty'])
+    Route::post('/login-third-party', [AuthController::class, 'registerWithThirdParty'])
         ->name('auth.register.third-party');
     Route::post('/login', [AuthController::class, 'login']);
     Route::post('/forgot-password', [PasswordResetController::class, 'sendCode']);
