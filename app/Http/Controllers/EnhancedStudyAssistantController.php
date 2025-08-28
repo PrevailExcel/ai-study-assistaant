@@ -265,22 +265,15 @@ class EnhancedStudyAssistantController extends Controller
                 }
             }
 
-            return response()->json([
-                'success' => true,
-                'questions' => $questions,
-                'content_sources' => $this->getContentSources($relevantContent),
-                'generation_params' => [
-                    'topic' => $topic,
-                    'count' => $count,
-                    'difficulty' => $difficulty,
-                    'types' => $questionTypes
-                ]
+            return $this->success([
+                'quiz' => $quiz,
+                'questions' => $quiz->questions()
             ]);
         } catch (\Exception $e) {
-            return response()->json([
-                'error' => 'Question generation failed',
-                'message' => $e->getMessage()
-            ], 500);
+            return $this->error(
+                'Question generation failed ' . $e->getMessage(),
+                500
+            );
         }
     }
 
