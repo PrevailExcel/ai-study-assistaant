@@ -3,7 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Agents\QuestionGeneratorAgent;
+use App\Helpers\PaginationHelper;
 use App\Models\Document;
+use App\Models\Question;
+use App\Models\Quiz;
 use App\Services\ChromaService;
 use App\Services\MultimediaFileProcessor;
 use Illuminate\Http\Request;
@@ -123,9 +126,12 @@ class EnhancedStudyAssistantController extends Controller
             $perPage = $perPage > 100 ? 100 : $perPage; // prevent abuse by limiting max
 
             $documents = Document::where('user_id', $request->user()->id)
-                ->simplePaginate($perPage);
+                ->paginate($perPage);
 
-            return $this->success(['documents' => $documents]);
+            return $this->success([
+                'documents' => $documents->items(),
+                'pagination' => PaginationHelper::format($documents)
+            ]);
         } catch (\Exception $e) {
             return $this->error(
                 'Failed to retrieve documents. ' . $e->getMessage(),
@@ -233,6 +239,31 @@ class EnhancedStudyAssistantController extends Controller
                 $difficulty,
                 $questionTypes
             );
+
+            // if questions, create quiz, and then add questions to quiz.
+            if ($questions) {
+                $quiz = new Quiz();
+                $quiz->document_id = $documentId;
+                $quiz->user_id = $request->user()->id;
+                $quiz->type = $questionTypes;
+                $quiz->number_of_questions = $count;
+                $quiz->topic = $topic;
+                $quiz->difficulty = $difficulty;
+                $quiz->save();
+
+                if ($quiz) {
+                    // For each question, create a Question
+                    foreach ($questions as $quest) {
+                        Question::create([
+                            'quiz_id'        => $quiz->id,
+                            'question_text'  => $quest['question'],
+                            'options'        => isset($quest['options']) ? json_encode($quest['options']) : null,
+                            'correct_answer' => $quest['correct_answer'] ?? null,
+                            'explanation'    => $quest['explanation'] ?? null,
+                        ]);
+                    }
+                }
+            }
 
             return response()->json([
                 'success' => true,
