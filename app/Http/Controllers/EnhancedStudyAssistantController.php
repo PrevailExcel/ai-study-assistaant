@@ -245,14 +245,13 @@ class EnhancedStudyAssistantController extends Controller
                 $quiz = new Quiz();
                 $quiz->document_id = $documentId;
                 $quiz->user_id = $request->user()->id;
-                $quiz->type = $questionTypes;
+                $quiz->type = is_array($questionTypes) ? implode(',', $questionTypes) : $questionTypes;
                 $quiz->number_of_questions = $count;
                 $quiz->topic = $topic;
                 $quiz->difficulty = $difficulty;
                 $quiz->save();
 
                 if ($quiz) {
-                    // For each question, create a Question
                     foreach ($questions as $quest) {
                         Question::create([
                             'quiz_id'        => $quiz->id,
@@ -264,6 +263,7 @@ class EnhancedStudyAssistantController extends Controller
                     }
                 }
             }
+
 
             return $this->success([
                 'quiz' => $quiz,
