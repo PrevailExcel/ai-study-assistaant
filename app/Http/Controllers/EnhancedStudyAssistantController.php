@@ -208,6 +208,7 @@ class EnhancedStudyAssistantController extends Controller
             $difficulty = $request->input('difficulty', 'medium');
             $questionTypes = $request->input('question_types', ['multiple_choice']);
             $includeVisual = $request->input('include_visual_content', true);
+            $quiz = null;
 
             logger()->info("📝 Generating questions for document '{$documentId}'", [
                 'topic' => $topic,
@@ -272,11 +273,12 @@ class EnhancedStudyAssistantController extends Controller
                     }
                 }
             }
-            $questions = Question::where('quiz_id', $quiz->id)->get();
+
+            $questionds = Question::where('quiz_id', $quiz->id)->get();
 
             return $this->success([
                 'quiz' => $quiz,
-                'questions' => $questions
+                'questions' => $questionds
             ]);
         } catch (\Exception $e) {
             return $this->error(
