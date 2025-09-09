@@ -12,6 +12,7 @@ use App\Services\MultimediaFileProcessor;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use NeuronAI\Chat\Messages\UserMessage;
@@ -242,7 +243,8 @@ class EnhancedStudyAssistantController extends Controller
 
             $documentUuid = Document::where('doc_id', $documentId)
                 ->where('user_id', $request->user()->id)
-                ->first()->id;
+                ->value('id');
+
             // if questions, create quiz, and then add questions to quiz.
             if ($questions) {
                 $quiz = new Quiz();
@@ -256,6 +258,10 @@ class EnhancedStudyAssistantController extends Controller
 
                 if ($quiz) {
                     foreach ($questions as $quest) {
+                        logger()->info("💡 Storing question", [
+                            'quiz_id' => $quiz->id,
+                            'question' => $quest
+                        ]);
                         Question::create([
                             'quiz_id'        => $quiz->id,
                             'question_text'  => $quest['question'],
