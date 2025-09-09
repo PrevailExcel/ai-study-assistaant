@@ -272,11 +272,11 @@ class EnhancedStudyAssistantController extends Controller
                     }
                 }
             }
-
+            $questions = Question::where('quiz_id', $quiz->id)->get();
 
             return $this->success([
                 'quiz' => $quiz,
-                'questions' => $quiz->questions()
+                'questions' => $questions
             ]);
         } catch (\Exception $e) {
             return $this->error(
