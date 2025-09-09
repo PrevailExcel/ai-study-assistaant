@@ -16,8 +16,8 @@ return new class extends Migration
             $table->foreignUuid('quiz_id')->constrained('quizzes')->onDelete('cascade');
             $table->text('question_text');
             $table->json('options')->nullable(); // For multiple choice questions
-            $table->string('correct_answer')->nullable();
-            $table->string('user_answer')->nullable();
+            $table->text('correct_answer')->nullable();
+            $table->text('user_answer')->nullable();
             $table->text('explanation')->nullable();
             $table->boolean('is_correct')->nullable();
             $table->timestamps();
