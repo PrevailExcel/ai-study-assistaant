@@ -240,10 +240,13 @@ class EnhancedStudyAssistantController extends Controller
                 $questionTypes
             );
 
+            $documentUuid = Document::where('doc_id', $documentId)
+                ->where('user_id', $request->user()->id)
+                ->first()->id;
             // if questions, create quiz, and then add questions to quiz.
             if ($questions) {
                 $quiz = new Quiz();
-                $quiz->document_id = $documentId;
+                $quiz->document_id = $documentUuid;
                 $quiz->user_id = $request->user()->id;
                 $quiz->type = is_array($questionTypes) ? implode(',', $questionTypes) : $questionTypes;
                 $quiz->number_of_questions = $count;
