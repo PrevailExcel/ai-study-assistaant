@@ -210,6 +210,14 @@ class EnhancedStudyAssistantController extends Controller
             $includeVisual = $request->input('include_visual_content', true);
             $quiz = null;
 
+
+            $documentUuid = Document::where('doc_id', $documentId)
+                ->where('user_id', $request->user()->id)
+                ->value('id');
+
+            if (!$documentUuid)
+                return $this->error('Document was not found or does not belong to the user', 404);
+
             logger()->info("📝 Generating questions for document '{$documentId}'", [
                 'topic' => $topic,
                 'count' => $count,
@@ -241,10 +249,6 @@ class EnhancedStudyAssistantController extends Controller
                 $difficulty,
                 $questionTypes
             );
-
-            $documentUuid = Document::where('doc_id', $documentId)
-                ->where('user_id', $request->user()->id)
-                ->value('id');
 
             // if questions, create quiz, and then add questions to quiz.
             if ($questions) {
