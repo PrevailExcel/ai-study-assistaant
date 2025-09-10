@@ -270,7 +270,7 @@ class EnhancedStudyAssistantController extends Controller
                         Question::create([
                             'quiz_id'        => $quiz->id,
                             'question_text'  => $quest['question'],
-                            'options'        => isset($quest['options']) ? json_encode($quest['options']) : null,
+                            'options'        => isset($quest['options']) ? json_decode($quest['options']) : null,
                             'correct_answer' => $quest['correct_answer'] ?? null,
                             'explanation'    => $quest['explanation'] ?? null,
                         ]);

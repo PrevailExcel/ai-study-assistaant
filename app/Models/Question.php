@@ -19,6 +19,11 @@ class Question extends Model
         'options' => 'array',
     ];
 
+    protected $hidden = [
+        "updated_at",
+        "created_at"
+    ];
+
     public function quiz()
     {
         return $this->belongsTo(Quiz::class);
