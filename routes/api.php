@@ -4,6 +4,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\EnhancedStudyAssistantController;
 use App\Http\Controllers\PasswordResetController;
 use App\Http\Controllers\SubscriptionController;
+use App\Http\Controllers\UserDataController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -45,6 +46,12 @@ Route::prefix('v1')->group(function () {
         // Summary generation
         Route::post('/generate-summary', [EnhancedStudyAssistantController::class, 'generateSummary'])
             ->name('study.generate-summary');
+
+        // List Quizes by Document
+        Route::get('/documents/quizes', [UserDataController::class, 'listQuizesByDocuments']);
+
+        // List Questions by Quizes
+        Route::get('/documents/quizes/questions', [UserDataController::class, 'listQuestionsByQuiz']);
 
         // Content search
         Route::post('/search', [EnhancedStudyAssistantController::class, 'searchContent'])
