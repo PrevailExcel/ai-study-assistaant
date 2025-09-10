@@ -323,18 +323,24 @@ class EnhancedStudyAssistantController extends Controller
             $allContent = $this->getAllDocumentContent($documentId, $includeMultimedia);
 
             if (empty($allContent)) {
-                return response()->json(['error' => 'Document not found'], 404);
+                return $this->error('Document not found', 404);
             }
 
             // Generate summary with multimedia context
             $summary = $this->generateSummaryWithContext($allContent, $summaryType, $maxLength);
 
+            // get document uuid first
+            $documentUuid = Document::where('doc_id', $documentId)
+                ->where('user_id', $request->user()->id)
+                ->value('id');
+
+            if (!$documentUuid)
+                return $this->error('Document was not found or does not belong to the user', 404);
+
             // Save summary to database
             $sum = Summary::create([
                 'user_id' => $request->user()->id,
-                'document_id' => Document::where('doc_id', $documentId)
-                    ->where('user_id', $request->user()->id)
-                    ->value('id'),
+                'document_id' => $documentUuid,
                 'content' => $summary,
                 'type' => $summaryType,
                 'max_length' => $maxLength
