@@ -24,4 +24,9 @@ class Plan extends Model
     {
         return $this->hasMany(Subscription::class);
     }
+
+    protected $hidden = [
+        "updated_at",
+        "created_at"
+    ];
 }

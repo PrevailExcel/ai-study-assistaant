@@ -20,7 +20,7 @@ class UserDataController extends Controller
             ->paginate($perPage);
 
         return $this->success([
-            'documents' => $quizes->items(),
+            'quizes' => $quizes->items(),
             'pagination' => PaginationHelper::format($quizes)
         ]);
     }
@@ -31,12 +31,11 @@ class UserDataController extends Controller
         $perPage = (int) $request->input('per_page', 10);
         $perPage = $perPage > 100 ? 100 : $perPage;
 
-        $quizes = Question::where('user_id', request()->user()->id)
-            ->where('quiz_id', $request->quiz_id)
+        $quizes = Question::where('quiz_id', $request->quiz_id)
             ->paginate($perPage);
 
         return $this->success([
-            'documents' => $quizes->items(),
+            'questions' => $quizes->items(),
             'pagination' => PaginationHelper::format($quizes)
         ]);
     }

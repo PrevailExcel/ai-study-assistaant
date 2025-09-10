@@ -37,4 +37,10 @@ class Subscription extends Model
     {
         return $this->is_active && now()->between($this->starts_at, $this->ends_at);
     }
+
+    protected $hidden = [
+        "updated_at",
+        "created_at"
+    ];
+
 }
