@@ -8,6 +8,7 @@ use App\Helpers\PaginationHelper;
 use App\Models\Document;
 use App\Models\Question;
 use App\Models\Quiz;
+use App\Models\Summary;
 use App\Services\ChromaService;
 use App\Services\MultimediaFileProcessor;
 use Illuminate\Http\Request;
@@ -328,15 +329,24 @@ class EnhancedStudyAssistantController extends Controller
             // Generate summary with multimedia context
             $summary = $this->generateSummaryWithContext($allContent, $summaryType, $maxLength);
 
-            return $this->success([
-                'summary' => $summary,
-                'summary_type' => $summaryType,
-                'content_stats' => $this->getContentStats($allContent),
-                'multimedia_elements' => $this->getMultimediaElements($allContent)
+            // Save summary to database
+            $sum = Summary::create([
+                'user_id' => $request->user()->id,
+                'document_id' => Document::where('doc_id', $documentId)
+                    ->where('user_id', $request->user()->id)
+                    ->value('id'),
+                'content' => $summary,
+                'type' => $summaryType,
+                'max_length' => $maxLength
             ]);
+
+            return $this->success(['summary' => $sum]);
+
         } catch (\Exception $e) {
-            return $this->error('Summary generation failed: ' .  $e->getMessage()
-            , 500);
+            return $this->error(
+                'Summary generation failed: ' .  $e->getMessage(),
+                500
+            );
         }
     }
 
@@ -647,41 +657,41 @@ Study Material:
         return $questions;
     }
 
-private function generateSummaryWithContext(array $content, string $type, int $maxLength): string
-{
-    $contextText = '';
-    $hasVisualContent = false;
+    private function generateSummaryWithContext(array $content, string $type, int $maxLength): string
+    {
+        $contextText = '';
+        $hasVisualContent = false;
 
-    foreach ($content as $item) {
-        $contextText .= $item['content'] . "\n\n";
-        if (($item['metadata']['content_type'] ?? null) === 'image_description') {
-            $hasVisualContent = true;
+        foreach ($content as $item) {
+            $contextText .= $item['content'] . "\n\n";
+            if (($item['metadata']['content_type'] ?? null) === 'image_description') {
+                $hasVisualContent = true;
+            }
         }
+
+        $prompts = [
+            'brief' => "Provide a brief summary (2-3 paragraphs) of the main points:",
+            'detailed' => "Provide a comprehensive summary covering all major topics and concepts:",
+            'key_points' => "Extract and organize the key points and important concepts:",
+            'visual_summary' => "Create a summary that emphasizes visual elements, charts, diagrams, and multimedia content:"
+        ];
+
+        $prompt = $prompts[$type] . "\n\n";
+
+        if ($hasVisualContent) {
+            $prompt .= "Note: This content includes visual elements (images, charts, diagrams) that have been described. Pay attention to these visual descriptions when creating the summary.\n\n";
+        }
+
+        $prompt .= "Keep the summary under {$maxLength} characters.\n\nContent:\n{$contextText}";
+
+        $response = SummaryGeneratorAgent::make()->chat(
+            new UserMessage($prompt)
+        );
+
+        $summary = trim($response->getContent());
+
+        return $summary ?: 'Failed to generate summary';
     }
-
-    $prompts = [
-        'brief' => "Provide a brief summary (2-3 paragraphs) of the main points:",
-        'detailed' => "Provide a comprehensive summary covering all major topics and concepts:",
-        'key_points' => "Extract and organize the key points and important concepts:",
-        'visual_summary' => "Create a summary that emphasizes visual elements, charts, diagrams, and multimedia content:"
-    ];
-
-    $prompt = $prompts[$type] . "\n\n";
-
-    if ($hasVisualContent) {
-        $prompt .= "Note: This content includes visual elements (images, charts, diagrams) that have been described. Pay attention to these visual descriptions when creating the summary.\n\n";
-    }
-
-    $prompt .= "Keep the summary under {$maxLength} characters.\n\nContent:\n{$contextText}";
-
-    $response = SummaryGeneratorAgent::make()->chat(
-        new UserMessage($prompt)
-    );
-
-    $summary = trim($response->getContent());
-
-    return $summary ?: 'Failed to generate summary';
-}
 
     private function generateStudyPlanWithAnthropic(array $content, int $duration, string $level, array $focusAreas): array
     {
