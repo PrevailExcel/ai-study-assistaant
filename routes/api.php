@@ -47,6 +47,9 @@ Route::prefix('v1')->group(function () {
         Route::post('/generate-summary', [EnhancedStudyAssistantController::class, 'generateSummary'])
             ->name('study.generate-summary');
 
+        // List Summaries
+        Route::get('/summaries', [UserDataController::class, 'listSummaries']);
+
         // List Quizes by Document
         Route::get('/documents/quizes', [UserDataController::class, 'listQuizesByDocuments']);
 
