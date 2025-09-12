@@ -2,10 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Agents\FlashcardGeneratorAgent;
 use App\Agents\QuestionGeneratorAgent;
 use App\Agents\SummaryGeneratorAgent;
 use App\Helpers\PaginationHelper;
 use App\Models\Document;
+use App\Models\Flashcard;
 use App\Models\Question;
 use App\Models\Quiz;
 use App\Models\Summary;
@@ -363,6 +365,72 @@ class EnhancedStudyAssistantController extends Controller
     }
 
     /**
+ * Generate flashcards from document content
+ */
+public function generateFlashcards(Request $request): JsonResponse
+{
+    $validator = Validator::make($request->all(), [
+        'document_id' => 'required|string',
+        'topic' => 'sometimes|string',
+        'count' => 'required|integer|min:10|max:50',
+        'include_visual_content' => 'sometimes|boolean'
+    ]);
+
+    if ($validator->fails()) {
+        return response()->json([
+            'error' => 'Validation failed',
+            'details' => $validator->errors()
+        ], 422);
+    }
+
+    try {
+        $documentId = $request->input('document_id');
+        $topic = $request->input('topic', 'main ideas and definitions');
+        $count = $request->input('count', 10);
+        $includeVisual = $request->input('include_visual_content', true);
+
+        $documentUuid = Document::where('doc_id', $documentId)
+            ->where('user_id', $request->user()->id)
+            ->value('id');
+
+        if (!$documentUuid) {
+            return $this->error('Document was not found or does not belong to the user', 404);
+        }
+
+        // Get relevant content
+        $relevantContent = $this->getRelevantContent($documentId, $topic, $includeVisual);
+
+        if (empty($relevantContent)) {
+            return response()->json(['error' => 'No relevant content found'], 404);
+        }
+
+        // Generate flashcards with your LLM agent
+        $flashcards = $this->generateFlashcardsWithContext(
+            $relevantContent,
+            $count,
+            $topic
+        );
+
+        $saved = [];
+        foreach ($flashcards as $fc) {
+            $saved[] = Flashcard::create([
+                'user_id' => $request->user()->id,
+                'document_id' => $documentUuid,
+                'front' => $fc['front'],   // question side
+                'back' => $fc['back'],     // answer side
+            ]);
+        }
+
+        return $this->success(['flashcards' => $saved]);
+    } catch (\Exception $e) {
+        return $this->error(
+            'Flashcard generation failed: ' . $e->getMessage(),
+            500
+        );
+    }
+}
+
+    /**
      * Search across multimedia content
      */
     public function searchContent(Request $request): JsonResponse
@@ -704,6 +772,31 @@ Study Material:
 
         return $summary ?: 'Failed to generate summary';
     }
+
+    private function generateFlashcardsWithContext(array $content, int $count, string $topic): array
+{
+    $contextText = '';
+    foreach ($content as $item) {
+        $contextText .= $item['content'] . "\n\n";
+    }
+
+    $prompt = "Based on the following study material, generate {$count} flashcards for the topic '{$topic}'.
+Each flashcard should be a JSON object with:
+- 'front': the question or prompt
+- 'back': the answer
+
+Return a valid JSON array.
+
+Study Material:
+{$contextText}";
+
+    $response = FlashcardGeneratorAgent::make()->chat(
+        new UserMessage($prompt)
+    );
+
+    return $this->cleanAndDecodeMarkdownJson($response->getContent());
+}
+
 
     private function generateStudyPlanWithAnthropic(array $content, int $duration, string $level, array $focusAreas): array
     {

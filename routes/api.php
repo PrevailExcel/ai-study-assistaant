@@ -47,6 +47,10 @@ Route::prefix('v1')->group(function () {
         Route::post('/generate-summary', [EnhancedStudyAssistantController::class, 'generateSummary'])
             ->name('study.generate-summary');
 
+        // Flashcard generation
+        Route::post('/generate-flashcard', [EnhancedStudyAssistantController::class, 'generateFlashcards'])
+            ->name('study.generate-flashcard');
+
         // List Summaries
         Route::get('/summaries', [UserDataController::class, 'listSummaries']);
 
