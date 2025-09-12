@@ -54,6 +54,9 @@ Route::prefix('v1')->group(function () {
         // List Summaries by Document
         Route::get('/summaries', [UserDataController::class, 'listSummaries']);
 
+        // Convert summary to audio
+        Route::get('/summaries/convert-to-audio', [UserDataController::class, 'summaryToAudio']);
+
         // List Flashcards by Document
         Route::get('/flashcards', [UserDataController::class, 'listFlashcards']);
 

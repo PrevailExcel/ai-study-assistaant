@@ -7,6 +7,8 @@ use App\Models\Flashcard;
 use App\Models\Question;
 use App\Models\Quiz;
 use App\Models\Summary;
+use App\Services\TtsFactory;
+use Exception;
 use Illuminate\Http\Request;
 
 class UserDataController extends Controller
@@ -49,7 +51,7 @@ class UserDataController extends Controller
         $perPage = $perPage > 100 ? 100 : $perPage;
 
         $summaries = Summary::where('user_id', request()->user()->id)
-                    ->where('document_id', $request->document_id)
+            ->where('document_id', $request->document_id)
             ->paginate($perPage);
 
         return $this->success([
@@ -65,7 +67,7 @@ class UserDataController extends Controller
         $perPage = $perPage > 100 ? 100 : $perPage;
 
         $summaries = Flashcard::where('user_id', request()->user()->id)
-                    ->where('document_id', $request->document_id)
+            ->where('document_id', $request->document_id)
             ->paginate($perPage);
 
         return $this->success([
@@ -74,5 +76,47 @@ class UserDataController extends Controller
         ]);
     }
 
+    public function answerQuestion(Request $request)
+    {
+        $request->validate([
+            'question_id' => 'required|string',
+            'answer' => 'required|string',
+        ]);
 
+        $question = Question::where('id', $request->question_id)
+            ->where('user_id', request()->user()->id)
+            ->first();
+
+        if (!$question) {
+            return $this->error('Question not found', 404);
+        }
+
+        $isCorrect = strtolower(trim($question->answer)) === strtolower(trim($request->answer));
+
+        return $this->success([
+            'correct' => $isCorrect,
+            'correct_answer' => $question->answer
+        ]);
+    }
+
+    public function summaryToAudio(Request $request)
+    {
+        try {
+            $summary = Summary::find($request->summary_id);
+            if(!$summary){
+                return $this->error('Summary was not found or does not belong to this user.');
+            }
+
+            $text = $summary->content;
+
+            $tts = TtsFactory::make();
+            $audioUrl = $tts->synthesize($text, 'summary.mp3');
+
+            return $this->success([
+                'audio_url' => $audioUrl
+            ]);
+        } catch (Exception $e) {
+            return $this->error('Error in processing audio: ' . $e->getMessage());
+        }
+    }
 }
