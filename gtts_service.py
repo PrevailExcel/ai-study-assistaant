@@ -3,10 +3,13 @@ import sys
 import os
 
 def synthesize(text, filename="summary.mp3", lang="en"):
-    tts = gTTS(text=text, lang=lang)
-    output_path = os.path.join("storage", "app", "public", filename)
+    base_path = os.path.dirname(os.path.abspath(__file__))  # points to Laravel root
+    output_path = os.path.join(base_path, "storage", "app", "public", filename)
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
+
+    tts = gTTS(text=text, lang=lang)
     tts.save(output_path)
+
     return output_path
 
 if __name__ == "__main__":
