@@ -373,7 +373,7 @@ public function generateFlashcards(Request $request): JsonResponse
         'document_id' => 'required|string',
         'topic' => 'sometimes|string',
         'count' => 'required|integer|min:10|max:50',
-        'include_visual_content' => 'sometimes|boolean'
+        'include_multimedia' => 'sometimes|boolean'
     ]);
 
     if ($validator->fails()) {
@@ -387,7 +387,7 @@ public function generateFlashcards(Request $request): JsonResponse
         $documentId = $request->input('document_id');
         $topic = $request->input('topic', 'main ideas and definitions');
         $count = $request->input('count', 10);
-        $includeVisual = $request->input('include_visual_content', true);
+        $includeVisual = $request->input('include_multimedia', true);
 
         $documentUuid = Document::where('doc_id', $documentId)
             ->where('user_id', $request->user()->id)
