@@ -128,8 +128,15 @@ class EnhancedStudyAssistantController extends Controller
             $perPage = (int) $request->input('per_page', 10); // default = 10
             $perPage = $perPage > 100 ? 100 : $perPage; // prevent abuse by limiting max
 
-            $documents = Document::where('user_id', $request->user()->id)
-                ->paginate($perPage);
+            $query = Document::where('user_id', $request->user()->id);
+
+            if ($search = $request->input('search')) {
+                $query->where('title', 'like', "%{$search}%")
+                    ->orWhere('metadata->original_name', 'like', "%{$search}%")
+                    ->orWhere('metadata->mime_type', 'like', "%{$search}%");
+            }
+
+            $documents = $query->paginate($perPage);
 
             return $this->success([
                 'documents' => $documents->items(),
@@ -347,7 +354,6 @@ class EnhancedStudyAssistantController extends Controller
             ]);
 
             return $this->success(['summary' => $sum]);
-
         } catch (\Exception $e) {
             return $this->error(
                 'Summary generation failed: ' .  $e->getMessage(),

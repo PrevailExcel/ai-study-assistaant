@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Testing\Fluent\Concerns\Has;
@@ -35,4 +36,9 @@ class Document extends Model
 
     public $incrementing = false;
     protected $keyType = 'string';
+
+    public function getCreatedAtFormattedAttribute(): string
+    {
+        return Carbon::parse($this->created_at)->format('jS M, Y');
+    }
 }
