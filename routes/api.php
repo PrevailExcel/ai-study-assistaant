@@ -77,10 +77,6 @@ Route::prefix('v1')->group(function () {
         Route::post('/search', [EnhancedStudyAssistantController::class, 'searchContent'])
             ->name('study.search');
 
-        // Document information
-        Route::get('/document/{documentId}', [EnhancedStudyAssistantController::class, 'getDocumentInfo'])
-            ->name('study.document-info');
-
         // Study plan generation
         Route::post('/generate-study-plan', [EnhancedStudyAssistantController::class, 'generateStudyPlan'])
             ->name('study.generate-study-plan');
