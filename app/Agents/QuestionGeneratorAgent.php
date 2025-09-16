@@ -44,9 +44,12 @@ class QuestionGeneratorAgent extends Agent
 
     protected function chatHistory(): FileChatHistory
     {
+            $userId = request()->user()?->id ?? 'guest';
+    $documentId = request()->input('document_id', 'unknown');
+
         return new FileChatHistory(
             directory: storage_path('app/public/'),
-            key: '[user-id].question-generator',
+            key: "$userId.$documentId.question-generator",
             contextWindow: 50000
         );
     }
