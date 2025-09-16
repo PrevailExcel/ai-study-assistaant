@@ -410,7 +410,7 @@ class EnhancedStudyAssistantController extends Controller
     /**
      * Extract topics, keywords, and headings from a document
      */
-    public function extractTopics(Request $request): JsonResponse
+    public function extractTopics(Request $request)
     {
         $validator = Validator::make($request->all(), [
             'document_id' => 'required|string',
@@ -447,7 +447,9 @@ class EnhancedStudyAssistantController extends Controller
                 return $this->error('Document was not found or does not belong to the user', 404);
             }
 
-            // Save to database if you want (optional)
+            // Save to database if you want / update the list of topics
+            return $topics;
+
             $topicRecord = Topic::create([
                 'user_id' => $request->user()->id,
                 'document_id' => $documentUuid,
