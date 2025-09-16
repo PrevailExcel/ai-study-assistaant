@@ -410,7 +410,7 @@ class EnhancedStudyAssistantController extends Controller
     /**
      * Extract topics, keywords, and headings from a document
      */
-    public function extractTopics(Request $request)
+    public function extractTopics(Request $request): JsonResponse
     {
         $validator = Validator::make($request->all(), [
             'document_id' => 'required|string',
@@ -448,13 +448,16 @@ class EnhancedStudyAssistantController extends Controller
             }
 
             // Save to database if you want / update the list of topics
-            return $topics;
+            $topicRecord = Topic::updateOrCreate(
+                [
+                    'user_id'     => $request->user()->id,
+                    'document_id' => $documentUuid,
+                ],
+                [
+                    'topics' => $topics,
+                ]
+            );
 
-            $topicRecord = Topic::create([
-                'user_id' => $request->user()->id,
-                'document_id' => $documentUuid,
-                'topics' => json_encode($topics['topics'] ?? []),
-            ]);
 
             return $this->success(['topics' => $topics]);
         } catch (AgentException $e) {
