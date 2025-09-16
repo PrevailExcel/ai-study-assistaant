@@ -49,7 +49,7 @@ class UserDataController extends Controller
 
     public function getDocumentDetails(Request $request, $documentId)
     {
-        $document = Document::where('doc_id', $documentId)
+        $document = Document::with('topics')->where('doc_id', $documentId)
             ->where('user_id', $request->user()->id)
             ->first();
 
@@ -58,8 +58,7 @@ class UserDataController extends Controller
         }
 
         return $this->success([
-            'document' => $document,
-            'topics' => $document->topics
+            'document' => $document
         ]);
     }
 
