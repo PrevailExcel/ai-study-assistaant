@@ -124,38 +124,6 @@ class EnhancedStudyAssistantController extends Controller
         }
     }
 
-    /**
-     * List documents uploaded by the user
-     */
-    public function listDocuments(Request $request): JsonResponse
-    {
-        try {
-            $perPage = (int) $request->input('per_page', 10); // default = 10
-            $perPage = $perPage > 100 ? 100 : $perPage; // prevent abuse by limiting max
-
-            $query = Document::where('user_id', $request->user()->id);
-
-            if ($search = $request->input('search')) {
-                $query->where('title', 'like', "%{$search}%")
-                    ->orWhere('metadata->original_name', 'like', "%{$search}%")
-                    ->orWhere('metadata->mime_type', 'like', "%{$search}%");
-            }
-
-            $documents = $query->paginate($perPage);
-
-            return $this->success([
-                'documents' => $documents->items(),
-                'pagination' => PaginationHelper::format($documents)
-            ]);
-        } catch (\Exception $e) {
-            return $this->error(
-                'Failed to retrieve documents. ' . $e->getMessage(),
-                500
-            );
-        }
-    }
-
-
     public function nameDocument(Request $request, string $documentId): JsonResponse
     {
         $validator = Validator::make($request->all(), [

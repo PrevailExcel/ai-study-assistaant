@@ -3,16 +3,66 @@
 namespace App\Http\Controllers;
 
 use App\Helpers\PaginationHelper;
+use App\Models\Document;
 use App\Models\Flashcard;
 use App\Models\Question;
 use App\Models\Quiz;
 use App\Models\Summary;
 use App\Services\TtsFactory;
 use Exception;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class UserDataController extends Controller
 {
+
+    /**
+     * List documents uploaded by the user
+     */
+    public function listDocuments(Request $request): JsonResponse
+    {
+        try {
+            $perPage = (int) $request->input('per_page', 10); // default = 10
+            $perPage = $perPage > 100 ? 100 : $perPage; // prevent abuse by limiting max
+
+            $query = Document::where('user_id', $request->user()->id);
+
+            if ($search = $request->input('search')) {
+                $query->where('title', 'like', "%{$search}%")
+                    ->orWhere('metadata->original_name', 'like', "%{$search}%")
+                    ->orWhere('metadata->mime_type', 'like', "%{$search}%");
+            }
+
+            $documents = $query->paginate($perPage);
+
+            return $this->success([
+                'documents' => $documents->items(),
+                'pagination' => PaginationHelper::format($documents)
+            ]);
+        } catch (\Exception $e) {
+            return $this->error(
+                'Failed to retrieve documents. ' . $e->getMessage(),
+                500
+            );
+        }
+    }
+
+    public function getDocumentDetails(Request $request, $documentId)
+    {
+        $document = Document::where('id', $documentId)
+            ->where('user_id', $request->user()->id)
+            ->first();
+
+        if (!$document) {
+            return $this->error('Document not found', 404);
+        }
+
+        return $this->success([
+            'document' => $document,
+            'topics' => $document->topics
+        ]);
+    }
+
     public function listQuizesByDocuments(Request $request)
     {
 
@@ -103,7 +153,7 @@ class UserDataController extends Controller
     {
         try {
             $summary = Summary::find($request->summary_id);
-            if(!$summary){
+            if (!$summary) {
                 return $this->error('Summary was not found or does not belong to this user.');
             }
 

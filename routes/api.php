@@ -33,7 +33,10 @@ Route::prefix('v1')->group(function () {
             ->name('study.upload');
 
         // List documents
-        Route::get('/documents', [EnhancedStudyAssistantController::class, 'listDocuments']);
+        Route::get('/documents', [UserDataController::class, 'listDocuments']);
+
+        // Get document
+        Route::get('/document/{documentId}', [UserDataController::class, 'getDocumentDetails']);
 
         //Name document
         Route::post('/document/{documentId}/name', [EnhancedStudyAssistantController::class, 'nameDocument'])

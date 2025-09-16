@@ -41,4 +41,29 @@ class Document extends Model
     {
         return Carbon::parse($this->created_at)->format('jS M, Y');
     }
+
+    public function user()
+    {
+        return $this->belongsTo(User::class);
+    }
+
+    public function summaries()
+    {
+        return $this->hasMany(Summary::class);
+    }
+
+    public function questions()
+    {
+        return $this->hasMany(Question::class);
+    }
+
+    public function flashcards()
+    {
+        return $this->hasMany(Flashcard::class);
+    }
+
+    public function topics()
+    {
+        return $this->hasMany(Topic::class);
+    }
 }
