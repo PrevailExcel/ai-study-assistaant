@@ -51,6 +51,10 @@ Route::prefix('v1')->group(function () {
         Route::post('/generate-flashcard', [EnhancedStudyAssistantController::class, 'generateFlashcards'])
             ->name('study.generate-flashcard');
 
+        // Topic Extraction
+        Route::post('/extract-topics', [EnhancedStudyAssistantController::class, 'extractTopics'])
+            ->name('study.extract-topics');
+
         // List Summaries by Document
         Route::get('/summaries', [UserDataController::class, 'listSummaries']);
 

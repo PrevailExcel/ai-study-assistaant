@@ -5,12 +5,14 @@ namespace App\Http\Controllers;
 use App\Agents\FlashcardGeneratorAgent;
 use App\Agents\QuestionGeneratorAgent;
 use App\Agents\SummaryGeneratorAgent;
+use App\Agents\TopicExtractorAgent;
 use App\Helpers\PaginationHelper;
 use App\Models\Document;
 use App\Models\Flashcard;
 use App\Models\Question;
 use App\Models\Quiz;
 use App\Models\Summary;
+use App\Models\Topic;
 use App\Services\ChromaService;
 use App\Services\MultimediaFileProcessor;
 use Illuminate\Http\Request;
@@ -20,6 +22,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use NeuronAI\Chat\Messages\UserMessage;
+use NeuronAI\Exceptions\AgentException;
 
 class EnhancedStudyAssistantController extends Controller
 {
@@ -295,6 +298,8 @@ class EnhancedStudyAssistantController extends Controller
                 'quiz' => $quiz,
                 'questions' => $questionds
             ]);
+        } catch (AgentException $e) {
+            return $this->error("LLM error: " . $e->getMessage(), $e->getCode());
         } catch (\Exception $e) {
             return $this->error(
                 'Question generation failed ' . $e->getMessage(),
@@ -356,6 +361,8 @@ class EnhancedStudyAssistantController extends Controller
             ]);
 
             return $this->success(['summary' => $sum]);
+        } catch (AgentException $e) {
+            return $this->error("LLM error: " . $e->getMessage(), $e->getCode());
         } catch (\Exception $e) {
             return $this->error(
                 'Summary generation failed: ' .  $e->getMessage(),
@@ -365,70 +372,130 @@ class EnhancedStudyAssistantController extends Controller
     }
 
     /**
- * Generate flashcards from document content
- */
-public function generateFlashcards(Request $request): JsonResponse
-{
-    $validator = Validator::make($request->all(), [
-        'document_id' => 'required|string',
-        'topic' => 'sometimes|string',
-        'count' => 'required|integer|min:10|max:50',
-        'include_multimedia' => 'sometimes|boolean'
-    ]);
+     * Generate flashcards from document content
+     */
+    public function generateFlashcards(Request $request): JsonResponse
+    {
+        $validator = Validator::make($request->all(), [
+            'document_id' => 'required|string',
+            'topic' => 'sometimes|string',
+            'count' => 'required|integer|min:10|max:50',
+            'include_multimedia' => 'sometimes|boolean'
+        ]);
 
-    if ($validator->fails()) {
-        return response()->json([
-            'error' => 'Validation failed',
-            'details' => $validator->errors()
-        ], 422);
+        if ($validator->fails()) {
+            return response()->json([
+                'error' => 'Validation failed',
+                'details' => $validator->errors()
+            ], 422);
+        }
+
+        try {
+            $documentId = $request->input('document_id');
+            $topic = $request->input('topic', 'main ideas and definitions');
+            $count = $request->input('count', 10);
+            $includeVisual = $request->input('include_multimedia', true);
+
+            $documentUuid = Document::where('doc_id', $documentId)
+                ->where('user_id', $request->user()->id)
+                ->value('id');
+
+            if (!$documentUuid) {
+                return $this->error('Document was not found or does not belong to the user', 404);
+            }
+
+            // Get relevant content
+            $relevantContent = $this->getRelevantContent($documentId, $topic, $includeVisual);
+
+            if (empty($relevantContent)) {
+                return response()->json(['error' => 'No relevant content found'], 404);
+            }
+
+            // Generate flashcards with your LLM agent
+            $flashcards = $this->generateFlashcardsWithContext(
+                $relevantContent,
+                $count,
+                $topic
+            );
+
+            $saved = [];
+            foreach ($flashcards as $fc) {
+                $saved[] = Flashcard::create([
+                    'user_id' => $request->user()->id,
+                    'document_id' => $documentUuid,
+                    'front' => $fc['front'],   // question side
+                    'back' => $fc['back'],     // answer side
+                ]);
+            }
+
+            return $this->success(['flashcards' => $saved]);
+        } catch (AgentException $e) {
+            return $this->error("LLM error: " . $e->getMessage(), $e->getCode());
+        } catch (\Exception $e) {
+            return $this->error(
+                'Flashcard generation failed: ' . $e->getMessage(),
+                500
+            );
+        }
     }
 
-    try {
-        $documentId = $request->input('document_id');
-        $topic = $request->input('topic', 'main ideas and definitions');
-        $count = $request->input('count', 10);
-        $includeVisual = $request->input('include_multimedia', true);
+    /**
+     * Extract topics, keywords, and headings from a document
+     */
+    public function extractTopics(Request $request): JsonResponse
+    {
+        $validator = Validator::make($request->all(), [
+            'document_id' => 'required|string',
+            'include_multimedia' => 'sometimes|boolean'
+        ]);
 
-        $documentUuid = Document::where('doc_id', $documentId)
-            ->where('user_id', $request->user()->id)
-            ->value('id');
-
-        if (!$documentUuid) {
-            return $this->error('Document was not found or does not belong to the user', 404);
+        if ($validator->fails()) {
+            return response()->json([
+                'error' => 'Validation failed',
+                'details' => $validator->errors()
+            ], 422);
         }
 
-        // Get relevant content
-        $relevantContent = $this->getRelevantContent($documentId, $topic, $includeVisual);
+        try {
+            $documentId = $request->input('document_id');
+            $includeMultimedia = $request->input('include_multimedia', false);
 
-        if (empty($relevantContent)) {
-            return response()->json(['error' => 'No relevant content found'], 404);
-        }
+            // Get all content for the document
+            $allContent = $this->getAllDocumentContent($documentId, $includeMultimedia);
 
-        // Generate flashcards with your LLM agent
-        $flashcards = $this->generateFlashcardsWithContext(
-            $relevantContent,
-            $count,
-            $topic
-        );
+            if (empty($allContent)) {
+                return $this->error('Document not found', 404);
+            }
 
-        $saved = [];
-        foreach ($flashcards as $fc) {
-            $saved[] = Flashcard::create([
+            // Generate topics + keywords + headings
+            $topics = $this->extractTopicsWithContext($allContent);
+
+            // Get document uuid first
+            $documentUuid = Document::where('doc_id', $documentId)
+                ->where('user_id', $request->user()->id)
+                ->value('id');
+
+            if (!$documentUuid) {
+                return $this->error('Document was not found or does not belong to the user', 404);
+            }
+
+            // Save to database if you want (optional)
+            $topicRecord = Topic::create([
                 'user_id' => $request->user()->id,
                 'document_id' => $documentUuid,
-                'front' => $fc['front'],   // question side
-                'back' => $fc['back'],     // answer side
+                'topics' => json_encode($topics['topics'] ?? []),
             ]);
-        }
 
-        return $this->success(['flashcards' => $saved]);
-    } catch (\Exception $e) {
-        return $this->error(
-            'Flashcard generation failed: ' . $e->getMessage(),
-            500
-        );
+            return $this->success(['topics' => $topics]);
+        } catch (AgentException $e) {
+            return $this->error("LLM error: " . $e->getMessage(), $e->getCode());
+        } catch (\Exception $e) {
+            return $this->error(
+                'Topic extraction failed: ' . $e->getMessage(),
+                500
+            );
+        }
     }
-}
 
     /**
      * Search across multimedia content
@@ -774,13 +841,13 @@ Study Material:
     }
 
     private function generateFlashcardsWithContext(array $content, int $count, string $topic): array
-{
-    $contextText = '';
-    foreach ($content as $item) {
-        $contextText .= $item['content'] . "\n\n";
-    }
+    {
+        $contextText = '';
+        foreach ($content as $item) {
+            $contextText .= $item['content'] . "\n\n";
+        }
 
-    $prompt = "Based on the following study material, generate {$count} flashcards for the topic '{$topic}'.
+        $prompt = "Based on the following study material, generate {$count} flashcards for the topic '{$topic}'.
 Each flashcard should be a JSON object with:
 - 'front': the question or prompt
 - 'back': the answer
@@ -790,12 +857,40 @@ Return a valid JSON array.
 Study Material:
 {$contextText}";
 
-    $response = FlashcardGeneratorAgent::make()->chat(
-        new UserMessage($prompt)
-    );
+        $response = FlashcardGeneratorAgent::make()->chat(
+            new UserMessage($prompt)
+        );
 
-    return $this->cleanAndDecodeMarkdownJson($response->getContent());
+        return $this->cleanAndDecodeMarkdownJson($response->getContent());
+    }
+
+    private function extractTopicsWithContext(array $content): array
+    {
+        $contextText = '';
+        foreach ($content as $item) {
+            $contextText .= $item['content'] . "\n\n";
+        }
+
+        $prompt = "
+Read the document carefully.
+If a Table of Contents is available, use it.
+Otherwise, identify the most important topics covered.
+
+Return only valid JSON in this format:
+{
+  \"topics\": [\"Topic 1\", \"Topic 2\", \"Topic 3\"]
 }
+
+Document:
+{$contextText}
+";
+
+        $response = TopicExtractorAgent::make()->chat(
+            new UserMessage($prompt)
+        );
+
+        return $this->cleanAndDecodeMarkdownJson($response->getContent())['topics'] ?? [];
+    }
 
 
     private function generateStudyPlanWithAnthropic(array $content, int $duration, string $level, array $focusAreas): array
