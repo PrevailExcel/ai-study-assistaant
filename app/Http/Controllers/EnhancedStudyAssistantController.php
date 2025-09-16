@@ -760,21 +760,28 @@ Format the response as a JSON array with objects containing: 'question', 'type',
 
 Study Material:
 {$contextText}";
+        try {
+            $response = QuestionGeneratorAgent::make()->chat(
+                new UserMessage($prompt)
+            );
 
-        $response = QuestionGeneratorAgent::make()->chat(
-            new UserMessage($prompt)
-        );
+            $questions = $this->cleanAndDecodeMarkdownJson($response->getContent());
 
-        $questions = $this->cleanAndDecodeMarkdownJson($response->getContent());
+            logger()->info("📝 Generated questions", [
+                'count' => count($questions),
+                'difficulty' => $difficulty,
+                'types' => $types,
+                'questions' => $questions
+            ]);
 
-        logger()->info("📝 Generated questions", [
-            'count' => count($questions),
-            'difficulty' => $difficulty,
-            'types' => $types,
-            'questions' => $questions
-        ]);
-
-        return $questions;
+            return $questions;
+        } catch (AgentException $e) {
+            Log::error("LLM error during question generation: " . $e->getMessage(), ['exception' => $e]);
+            throw $e; // rethrow to be caught in the calling method
+        } catch (\Exception $e) {
+            Log::error("Error during question generation: " . $e->getMessage(), ['exception' => $e]);
+            throw $e; // rethrow to be caught in the calling method
+        }
     }
 
     private function generateSummaryWithContext(array $content, string $type, int $maxLength): string
