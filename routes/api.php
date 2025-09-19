@@ -62,7 +62,7 @@ Route::prefix('v1')->group(function () {
         Route::get('/summaries', [UserDataController::class, 'listSummaries']);
 
         // Submit answers
-        Route::get('/submit-answers', [UserDataController::class, 'submitAnswers']);
+        Route::post('/submit-answers', [UserDataController::class, 'submitAnswers']);
 
         // Convert summary to audio
         Route::get('/summaries/convert-to-audio', [UserDataController::class, 'summaryToAudio']);
