@@ -952,36 +952,6 @@ Study Material:
         ];
     }
 
-    private function getContentSources(array $content): array
-    {
-        $sources = [];
-        foreach ($content as $item) {
-            $sources[] = $item['metadata']['content_type'];
-        }
-        return array_unique($sources);
-    }
-
-    private function getContentStats(array $content): array
-    {
-        $stats = ['total_chunks' => count($content)];
-
-        $types = array_column(array_column($content, 'metadata'), 'content_type');
-        $stats['content_types'] = array_count_values($types);
-
-        return $stats;
-    }
-
-    private function getMultimediaElements(array $content): array
-    {
-        $elements = [];
-        foreach ($content as $item) {
-            if (in_array($item['metadata']['content_type'], ['image_description', 'transcript'])) {
-                $elements[] = $item['metadata']['content_type'];
-            }
-        }
-        return array_unique($elements);
-    }
-
     private function filterSearchResults(array $results, array $documentIds, array $contentTypes): array
     {
         // Implementation for filtering search results
