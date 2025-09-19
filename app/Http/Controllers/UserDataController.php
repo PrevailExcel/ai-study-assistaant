@@ -130,36 +130,42 @@ class UserDataController extends Controller
         $request->validate([
             'quiz_id' => 'required|string',
             'answers' => 'required|array',
+            'answers.*.question_id' => 'required|integer',
+            'answers.*.user_answer' => 'required|string',
         ]);
 
         $quiz = Quiz::where('id', $request->quiz_id)
-            ->where('user_id', request()->user()->id)
+            ->where('user_id', $request->user()->id)
             ->first();
-            $answers = collect($request->answers);
 
-        if (!$quiz)
+        if (!$quiz) {
             return $this->error('Quiz not found', 404);
+        }
 
-        // answers array must include question_id, user_answer
-        if(!isset($answers['question_id']) || !isset($answers['user_answer']))
-            return $this->error('Answers are not properly formatted', 419);
+        $answers = collect($request->answers);
 
         $correctScores = 0;
-        // foreach answer, check and update Question
+
         foreach ($answers as $answer) {
-            $question = Question::find($answer->question_id);
-            if(!$question || $question->quiz->user_id != request()->user()->id)
+            $question = Question::find($answer['question_id']);
+            if (!$question || $question->quiz->user_id != $request->user()->id) {
                 continue;
-            $isCorrect = strtolower(trim($question->answer)) === strtolower(trim($answer->user_answer));
+            }
+
+            $isCorrect = strtolower(trim($question->answer)) === strtolower(trim($answer['user_answer']));
+
             $question->is_correct = $isCorrect;
-            $question->user_answer = $answer->user_answer;
+            $question->user_answer = $answer['user_answer'];
             $question->save();
 
-            if($isCorrect)
+            if ($isCorrect) {
                 $correctScores++;
+            }
         }
+
         $totalQuestions = $answers->count();
         $score = "$correctScores/$totalQuestions";
+
         $all = Question::where('quiz_id', $request->quiz_id)->get();
 
         return $this->success([
