@@ -152,7 +152,7 @@ class UserDataController extends Controller
                 continue;
             }
 
-            $isCorrect = strtolower(trim($question->answer)) === strtolower(trim($answer['user_answer']));
+            $isCorrect = strtolower(trim($question->correct_answer)) === strtolower(trim($answer['user_answer']));
 
             $question->is_correct = $isCorrect;
             $question->user_answer = $answer['user_answer'];
