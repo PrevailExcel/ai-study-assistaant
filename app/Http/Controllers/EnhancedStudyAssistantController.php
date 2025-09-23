@@ -279,6 +279,9 @@ class EnhancedStudyAssistantController extends Controller
     /**
      * Generate comprehensive summary with multimedia elements
      */
+    /**
+     * Generate summaries per topic for a document
+     */
     public function generateSummary(Request $request): JsonResponse
     {
         $validator = Validator::make($request->all(), [
@@ -301,34 +304,66 @@ class EnhancedStudyAssistantController extends Controller
             $includeMultimedia = $request->input('include_multimedia', true);
             $maxLength = $request->input('max_length', 2000);
 
-            // Get all content for the document
-            $allContent = $this->getAllDocumentContent($documentId, $includeMultimedia);
-
-            if (empty($allContent)) {
-                return $this->error('Document not found', 404);
-            }
-
-            // Generate summary with multimedia context
-            $summary = $this->generateSummaryWithContext($allContent, $summaryType, $maxLength);
-
             // get document uuid first
             $documentUuid = Document::where('doc_id', $documentId)
                 ->where('user_id', $request->user()->id)
                 ->value('id');
 
-            if (!$documentUuid)
+            if (!$documentUuid) {
                 return $this->error('Document was not found or does not belong to the user', 404);
+            }
 
-            // Save summary to database
-            $sum = Summary::create([
-                'user_id' => $request->user()->id,
-                'document_id' => $documentUuid,
-                'content' => $summary,
-                'type' => $summaryType,
-                'max_length' => $maxLength
+            // Get all content for the document
+            $allContent = $this->getAllDocumentContent($documentId, $includeMultimedia);
+            if (empty($allContent)) {
+                return $this->error('Document not found', 404);
+            }
+            // ✅ Fetch topics linked to this document
+            $topics = Topic::where('document_id', $documentUuid)->get();
+
+            if ($topics->isEmpty()) {
+                return $this->error('No topics found for this document', 404);
+            }
+
+            $agent = new SummaryGeneratorAgent();
+            $results = [];
+
+            // ✅ Batch process topics
+            foreach ($topics->chunk(3) as $batch) {
+                $topicNames = $batch->pluck('name')->toArray();
+
+                // Use your helper instead of raw ask()
+                $summaries = $this->generateSummaryWithContext($allContent, $summaryType, $maxLength, $topicNames);
+
+                foreach ($batch as $i => $topic) {
+                    $summary = trim($summaries[$i] ?? '');
+
+                    $record = Summary::updateOrCreate(
+                        [
+                            'user_id' => $request->user()->id,
+                            'document_id' => $documentUuid,
+                            'topic_id' => $topic->id,
+                        ],
+                        [
+                            'content' => $summary,
+                            'type' => $summaryType,
+                            'max_length' => $maxLength,
+                        ]
+                    );
+
+                    $results[] = $record;
+                }
+            }
+            logger()->info("📝 Generated summaries", [
+                'document_id' => $documentId,
+                'summary_type' => $summaryType,
+                'include_multimedia' => $includeMultimedia,
+                'max_length' => $maxLength,
+                'summary_count' => count($results),
+                'summaries' => $results
             ]);
 
-            return $this->success(['summary' => $sum]);
+            return $this->success(['summaries' => $results]);
         } catch (AgentException $e) {
             return $this->error("LLM error: " . $e->getMessage(), $e->getCode());
         } catch (\Exception $e) {
@@ -783,8 +818,7 @@ Study Material:
             throw $e; // rethrow to be caught in the calling method
         }
     }
-
-    private function generateSummaryWithContext(array $content, string $type, int $maxLength): string
+    private function generateSummaryWithContext(array $content, string $type, int $maxLength, array $topics = []): array|string
     {
         $contextText = '';
         $hasVisualContent = false;
@@ -797,19 +831,27 @@ Study Material:
         }
 
         $prompts = [
-            'brief' => "Provide a brief summary (2-3 paragraphs) of the main points:",
-            'detailed' => "Provide a comprehensive summary covering all major topics and concepts:",
-            'key_points' => "Extract and organize the key points and important concepts:",
+            'brief' => "Provide a brief summary (2-3 paragraphs):",
+            'detailed' => "Provide a comprehensive summary covering all major topics:",
+            'key_points' => "Extract and organize the key points:",
             'visual_summary' => "Create a summary that emphasizes visual elements, charts, diagrams, and multimedia content:"
         ];
 
-        $prompt = $prompts[$type] . "\n\n";
-
-        if ($hasVisualContent) {
-            $prompt .= "Note: This content includes visual elements (images, charts, diagrams) that have been described. Pay attention to these visual descriptions when creating the summary.\n\n";
+        if (!empty($topics)) {
+            $prompt = "Summarize the document content **for each of these topics separately**:\n\n";
+            foreach ($topics as $i => $topic) {
+                $prompt .= ($i + 1) . ". {$topic}\n";
+            }
+            $prompt .= "\nStyle: {$type}. Keep each summary under {$maxLength} characters.";
+        } else {
+            $prompt = $prompts[$type] . "\n\nKeep the summary under {$maxLength} characters.";
         }
 
-        $prompt .= "Keep the summary under {$maxLength} characters.\n\nContent:\n{$contextText}";
+        if ($hasVisualContent) {
+            $prompt .= "\n\nNote: This content includes visual elements that have been described.";
+        }
+
+        $prompt .= "\n\nContent:\n{$contextText}";
 
         $response = SummaryGeneratorAgent::make()->chat(
             new UserMessage($prompt)
@@ -817,8 +859,14 @@ Study Material:
 
         $summary = trim($response->getContent());
 
+        // If topics were requested, return an array split by numbering
+        if (!empty($topics)) {
+            return preg_split('/\d+\.\s*/', $summary, -1, PREG_SPLIT_NO_EMPTY);
+        }
+
         return $summary ?: 'Failed to generate summary';
     }
+
 
     private function generateFlashcardsWithContext(array $content, int $count, string $topic): array
     {

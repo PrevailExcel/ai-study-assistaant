@@ -15,6 +15,7 @@ return new class extends Migration
             $table->uuid('id')->primary();
             $table->foreignUuid('user_id')->constrained('users');
             $table->foreignUuid('document_id')->constrained('documents');
+            $table->foreignUuid('topic_id')->constrained('topics');
             $table->longText('content');
             $table->enum('type', ['brief', 'detailed', 'key_points', 'visual'])->default('brief'); // e.g., brief, detailed, key_points, visual
             $table->integer('max_length')->default(100);

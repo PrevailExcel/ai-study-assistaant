@@ -15,6 +15,7 @@ class Summary extends Model
     protected $fillable = [
         'user_id',
         'document_id',
+        'topic_id',
         'content',
         'type',
         'max_length'
