@@ -335,6 +335,15 @@ class EnhancedStudyAssistantController extends Controller
 
             $results = [];
 
+            logger()->info("📝 Generated summaries for document '{$documentId}'", [
+                'document_id' => $documentId,
+                'user_id' => $request->user()->id,
+                'summary_type' => $summaryType,
+                'max_length' => $maxLength,
+                'topics_count' => count($topicList),
+                'summaries' => $summaries
+            ]);
+
             // Save each topic’s summary separately
             foreach ($topicList as $i => $topicName) {
                 $record = Summary::updateOrCreate(
