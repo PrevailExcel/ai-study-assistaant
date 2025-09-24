@@ -315,32 +315,37 @@ class EnhancedStudyAssistantController extends Controller
             if (empty($allContent)) {
                 return $this->error('Document not found', 404);
             }
+            // Fetch single topics row for this document
+            $topicRecord = Topic::where('document_id', $documentUuid)->first();
 
-            // Fetch topics for this document
-            $topics = Topic::where('document_id', $documentUuid)->pluck('name', 'id');
-            if ($topics->isEmpty()) {
+            if (!$topicRecord) {
                 return $this->error('No topics found for this document', 404);
             }
 
-            // ✅ Call summary generator ONCE with all topics
+            // Decode topics JSON into array
+            $topicList = json_decode($topicRecord->topics, true) ?? [];
+
+            // Generate summaries for all topics at once
             $summaries = $this->generateSummaryWithContext(
                 $allContent,
                 $summaryType,
                 $maxLength,
-                $topics->values()->toArray()
+                $topicList
             );
 
-            // ✅ Save summaries (updateOrCreate per topic_id)
             $results = [];
-            foreach ($topics as $topicId => $topicName) {
+
+            // Save each topic’s summary separately
+            foreach ($topicList as $i => $topicName) {
                 $record = Summary::updateOrCreate(
                     [
                         'user_id' => $request->user()->id,
                         'document_id' => $documentUuid,
-                        'topic_id' => $topicId,
+                        'topic_id' => $topicRecord->id, // 🔑 link to the JSON container row
+                        'topic_index' => $i, // optional: store index inside JSON
                     ],
                     [
-                        'content' => $summaries[$topicName] ?? '',
+                        'content' => $summaries[$i] ?? '',
                         'type' => $summaryType,
                         'max_length' => $maxLength,
                     ]

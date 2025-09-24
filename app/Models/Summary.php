@@ -16,6 +16,7 @@ class Summary extends Model
         'user_id',
         'document_id',
         'topic_id',
+        'topic_index',
         'content',
         'type',
         'max_length'
