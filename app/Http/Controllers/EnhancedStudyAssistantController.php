@@ -323,7 +323,7 @@ class EnhancedStudyAssistantController extends Controller
             }
 
             // Decode topics JSON into array
-            $topicList = json_decode($topicRecord->topics, true) ?? [];
+            $topicList = $topicRecord->topics ?? [];
 
             // Generate summaries for all topics at once
             $summaries = $this->generateSummaryWithContext(
