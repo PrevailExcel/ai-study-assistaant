@@ -131,7 +131,7 @@ class UserDataController extends Controller
             'quiz_id' => 'required|string',
             'answers' => 'required|array',
             'answers.*.question_id' => 'required|integer',
-            'answers.*.user_answer' => 'required|string',
+            'answers.*.user_answer' => 'sometimes|string|nullable',
         ]);
 
         $quiz = Quiz::where('id', $request->quiz_id)
