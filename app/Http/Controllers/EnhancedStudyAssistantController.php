@@ -277,9 +277,6 @@ class EnhancedStudyAssistantController extends Controller
     }
 
     /**
-     * Generate comprehensive summary with multimedia elements
-     */
-    /**
      * Generate summaries per topic for a document
      */
     public function generateSummary(Request $request): JsonResponse
@@ -301,10 +298,10 @@ class EnhancedStudyAssistantController extends Controller
         try {
             $documentId = $request->input('document_id');
             $summaryType = $request->input('summary_type', 'detailed');
-            $includeMultimedia = $request->input('include_multimedia', true);
+            $includeMultimedia = $request->boolean('include_multimedia', true);
             $maxLength = $request->input('max_length', 2000);
 
-            // get document uuid first
+            // Get document UUID
             $documentUuid = Document::where('doc_id', $documentId)
                 ->where('user_id', $request->user()->id)
                 ->value('id');
@@ -313,55 +310,43 @@ class EnhancedStudyAssistantController extends Controller
                 return $this->error('Document was not found or does not belong to the user', 404);
             }
 
-            // Get all content for the document
+            // Get all document content
             $allContent = $this->getAllDocumentContent($documentId, $includeMultimedia);
             if (empty($allContent)) {
                 return $this->error('Document not found', 404);
             }
-            // ✅ Fetch topics linked to this document
-            $topics = Topic::where('document_id', $documentUuid)->get();
 
+            // Fetch topics for this document
+            $topics = Topic::where('document_id', $documentUuid)->pluck('name', 'id');
             if ($topics->isEmpty()) {
                 return $this->error('No topics found for this document', 404);
             }
 
-            $agent = new SummaryGeneratorAgent();
+            // ✅ Call summary generator ONCE with all topics
+            $summaries = $this->generateSummaryWithContext(
+                $allContent,
+                $summaryType,
+                $maxLength,
+                $topics->values()->toArray()
+            );
+
+            // ✅ Save summaries (updateOrCreate per topic_id)
             $results = [];
-
-            // ✅ Batch process topics
-            foreach ($topics->chunk(3) as $batch) {
-                $topicNames = $batch->pluck('name')->toArray();
-
-                // Use your helper instead of raw ask()
-                $summaries = $this->generateSummaryWithContext($allContent, $summaryType, $maxLength, $topicNames);
-
-                foreach ($batch as $i => $topic) {
-                    $summary = trim($summaries[$i] ?? '');
-
-                    $record = Summary::updateOrCreate(
-                        [
-                            'user_id' => $request->user()->id,
-                            'document_id' => $documentUuid,
-                            'topic_id' => $topic->id,
-                        ],
-                        [
-                            'content' => $summary,
-                            'type' => $summaryType,
-                            'max_length' => $maxLength,
-                        ]
-                    );
-
-                    $results[] = $record;
-                }
+            foreach ($topics as $topicId => $topicName) {
+                $record = Summary::updateOrCreate(
+                    [
+                        'user_id' => $request->user()->id,
+                        'document_id' => $documentUuid,
+                        'topic_id' => $topicId,
+                    ],
+                    [
+                        'content' => $summaries[$topicName] ?? '',
+                        'type' => $summaryType,
+                        'max_length' => $maxLength,
+                    ]
+                );
+                $results[] = $record;
             }
-            logger()->info("📝 Generated summaries", [
-                'document_id' => $documentId,
-                'summary_type' => $summaryType,
-                'include_multimedia' => $includeMultimedia,
-                'max_length' => $maxLength,
-                'summary_count' => count($results),
-                'summaries' => $results
-            ]);
 
             return $this->success(['summaries' => $results]);
         } catch (AgentException $e) {
@@ -818,8 +803,13 @@ Study Material:
             throw $e; // rethrow to be caught in the calling method
         }
     }
-    private function generateSummaryWithContext(array $content, string $type, int $maxLength, array $topics = []): array|string
-    {
+
+    private function generateSummaryWithContext(
+        array $content,
+        string $type,
+        int $maxLength,
+        array $topics = []
+    ): array|string {
         $contextText = '';
         $hasVisualContent = false;
 
@@ -859,9 +849,17 @@ Study Material:
 
         $summary = trim($response->getContent());
 
-        // If topics were requested, return an array split by numbering
         if (!empty($topics)) {
-            return preg_split('/\d+\.\s*/', $summary, -1, PREG_SPLIT_NO_EMPTY);
+            // Split response into chunks
+            $chunks = preg_split('/\d+\.\s*/', $summary, -1, PREG_SPLIT_NO_EMPTY);
+
+            // Map back to topics (safe: if mismatch, fallback to empty string)
+            $results = [];
+            foreach ($topics as $i => $topic) {
+                $results[$topic] = trim($chunks[$i] ?? '');
+            }
+
+            return $results; // ✅ associative array
         }
 
         return $summary ?: 'Failed to generate summary';
