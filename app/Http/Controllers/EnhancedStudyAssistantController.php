@@ -282,24 +282,24 @@ class EnhancedStudyAssistantController extends Controller
     public function generateSummary(Request $request): JsonResponse
     {
         $validator = Validator::make($request->all(), [
-            'document_id' => 'required|string',
-            'summary_type' => 'sometimes|string|in:brief,detailed,key_points,visual_summary',
+            'document_id'       => 'required|string',
+            'summary_type'      => 'sometimes|string|in:brief,detailed,key_points,visual_summary',
             'include_multimedia' => 'sometimes|boolean',
-            'max_length' => 'sometimes|integer|min:100|max:5000'
+            'max_length'        => 'sometimes|integer|min:100|max:5000'
         ]);
 
         if ($validator->fails()) {
             return response()->json([
-                'error' => 'Validation failed',
+                'error'   => 'Validation failed',
                 'details' => $validator->errors()
             ], 422);
         }
 
         try {
-            $documentId = $request->input('document_id');
-            $summaryType = $request->input('summary_type', 'detailed');
+            $documentId        = $request->input('document_id');
+            $summaryType       = $request->input('summary_type', 'detailed');
             $includeMultimedia = $request->boolean('include_multimedia', true);
-            $maxLength = $request->input('max_length', 2000);
+            $maxLength         = $request->input('max_length', 2000);
 
             // Get document UUID
             $documentUuid = Document::where('doc_id', $documentId)
@@ -315,17 +315,16 @@ class EnhancedStudyAssistantController extends Controller
             if (empty($allContent)) {
                 return $this->error('Document not found', 404);
             }
-            // Fetch single topics row for this document
-            $topicRecord = Topic::where('document_id', $documentUuid)->first();
 
+            // Fetch topics
+            $topicRecord = Topic::where('document_id', $documentUuid)->first();
             if (!$topicRecord) {
                 return $this->error('No topics found for this document', 404);
             }
 
-            // Decode topics JSON into array
             $topicList = $topicRecord->topics ?? [];
 
-            // Generate summaries for all topics at once
+            // Generate summaries (indexed by topic_index)
             $summaries = $this->generateSummaryWithContext(
                 $allContent,
                 $summaryType,
@@ -336,29 +335,30 @@ class EnhancedStudyAssistantController extends Controller
             $results = [];
 
             logger()->info("📝 Generated summaries for document '{$documentId}'", [
-                'document_id' => $documentId,
-                'user_id' => $request->user()->id,
-                'summary_type' => $summaryType,
-                'max_length' => $maxLength,
-                'topics_count' => count($topicList),
-                'summaries' => $summaries
+                'document_id'   => $documentId,
+                'user_id'       => $request->user()->id,
+                'summary_type'  => $summaryType,
+                'max_length'    => $maxLength,
+                'topics_count'  => count($topicList),
+                'summaries'     => array_combine($topicList, $summaries) // prettier logs
             ]);
 
-            // Save each topic’s summary separately
+            // Save each summary with its topic_index
             foreach ($topicList as $i => $topicName) {
                 $record = Summary::updateOrCreate(
                     [
-                        'user_id' => $request->user()->id,
+                        'user_id'     => $request->user()->id,
                         'document_id' => $documentUuid,
-                        'topic_id' => $topicRecord->id, // 🔑 link to the JSON container row
-                        'topic_index' => $i, // optional: store index inside JSON
+                        'topic_id'    => $topicRecord->id,
+                        'topic_index' => $i,
                     ],
                     [
-                        'content' => $summaries[$i] ?? '',
-                        'type' => $summaryType,
+                        'content'    => $summaries[$i] ?? '',
+                        'type'       => $summaryType,
                         'max_length' => $maxLength,
                     ]
                 );
+
                 $results[] = $record;
             }
 
@@ -372,6 +372,7 @@ class EnhancedStudyAssistantController extends Controller
             );
         }
     }
+
 
     /**
      * Generate flashcards from document content
@@ -817,7 +818,6 @@ Study Material:
             throw $e; // rethrow to be caught in the calling method
         }
     }
-
     private function generateSummaryWithContext(
         array $content,
         string $type,
@@ -835,18 +835,23 @@ Study Material:
         }
 
         $prompts = [
-            'brief' => "Provide a brief summary (2-3 paragraphs):",
-            'detailed' => "Provide a comprehensive summary covering all major topics:",
-            'key_points' => "Extract and organize the key points:",
+            'brief'          => "Provide a brief summary (2-3 paragraphs):",
+            'detailed'       => "Provide a comprehensive summary covering all major topics:",
+            'key_points'     => "Extract and organize the key points:",
             'visual_summary' => "Create a summary that emphasizes visual elements, charts, diagrams, and multimedia content:"
         ];
 
         if (!empty($topics)) {
-            $prompt = "Summarize the document content **for each of these topics separately**:\n\n";
+            $prompt = "Summarize the following document for each topic listed.
+Return ONLY plain text summaries.
+Do not include introductions, disclaimers, or extra text.
+Output must follow this format exactly:\n\n";
+
             foreach ($topics as $i => $topic) {
-                $prompt .= ($i + 1) . ". {$topic}\n";
+                $prompt .= ($i + 1) . ". <summary for {$topic}>\n";
             }
-            $prompt .= "\nStyle: {$type}. Keep each summary under {$maxLength} characters.";
+
+            $prompt .= "\nEach summary should be in {$type} style and under {$maxLength} characters.";
         } else {
             $prompt = $prompts[$type] . "\n\nKeep the summary under {$maxLength} characters.";
         }
@@ -864,20 +869,20 @@ Study Material:
         $summary = trim($response->getContent());
 
         if (!empty($topics)) {
-            // Split response into chunks
+            // Split into numbered parts
             $chunks = preg_split('/\d+\.\s*/', $summary, -1, PREG_SPLIT_NO_EMPTY);
 
-            // Map back to topics (safe: if mismatch, fallback to empty string)
             $results = [];
             foreach ($topics as $i => $topic) {
-                $results[$topic] = trim($chunks[$i] ?? '');
+                $results[$i] = trim($chunks[$i] ?? ''); // index aligned to topic_index
             }
 
-            return $results; // ✅ associative array
+            return $results;
         }
 
         return $summary ?: 'Failed to generate summary';
     }
+
 
 
     private function generateFlashcardsWithContext(array $content, int $count, string $topic): array
