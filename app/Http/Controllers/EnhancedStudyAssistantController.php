@@ -17,6 +17,7 @@ use App\Services\ChromaService;
 use App\Services\MultimediaFileProcessor;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
@@ -285,6 +286,8 @@ class EnhancedStudyAssistantController extends Controller
             'document_id'       => 'required|string',
             'summary_type'      => 'sometimes|string|in:brief,detailed,key_points,visual_summary',
             'include_multimedia' => 'sometimes|boolean',
+            'topic_ids' => 'sometimes|array',
+            'topic_ids.*' => 'exists:topics,id',
             'max_length'        => 'sometimes|integer|min:100|max:5000'
         ]);
 
@@ -316,15 +319,19 @@ class EnhancedStudyAssistantController extends Controller
                 return $this->error('Document not found', 404);
             }
 
-            // Fetch topics
-            $topicRecord = Topic::where('document_id', $documentUuid)->first();
-            if (!$topicRecord) {
-                return $this->error('No topics found for this document', 404);
+            $document = Document::find($documentUuid);
+
+            // Fetch topics either from request or from document relation
+            if ($request->filled('topic_ids')) {
+                $topicList = Topic::whereIn('id', $request->input('topic_ids'))
+                    ->where('document_id', $documentUuid)
+                    ->where('user_id', $request->user()->id)
+                    ->get();
+            } else {
+                $topicList = $document->topics;
             }
 
-            $topicList = $topicRecord->topics ?? [];
 
-            // Generate summaries (indexed by topic_index)
             $summaries = $this->generateSummaryWithContext(
                 $allContent,
                 $summaryType,
@@ -334,27 +341,16 @@ class EnhancedStudyAssistantController extends Controller
 
             $results = [];
 
-            logger()->info("📝 Generated summaries for document '{$documentId}'", [
-                'document_id'   => $documentId,
-                'user_id'       => $request->user()->id,
-                'summary_type'  => $summaryType,
-                'max_length'    => $maxLength,
-                'topics_count'  => count($topicList),
-                'summaries'     => array_combine($topicList, $summaries) // prettier logs
-            ]);
-
-            // Save each summary with its topic_index
-            foreach ($topicList as $i => $topicName) {
+            foreach ($topicList as $topic) {
                 $record = Summary::updateOrCreate(
                     [
                         'user_id'     => $request->user()->id,
                         'document_id' => $documentUuid,
-                        'topic_id'    => $topicRecord->id,
-                        'topic_index' => $i,
+                        'topic_id'    => $topic->id,
                     ],
                     [
-                        'content'    => $summaries[$i] ?? '',
-                        'type'       => $summaryType,
+                        'content'    => $summaries[$topic->id] ?? '',
+                        'type'        => $summaryType,
                         'max_length' => $maxLength,
                     ]
                 );
@@ -483,16 +479,20 @@ class EnhancedStudyAssistantController extends Controller
             }
 
             // Save to database if you want / update the list of topics
-            $topicRecord = Topic::updateOrCreate(
-                [
-                    'user_id'     => $request->user()->id,
-                    'document_id' => $documentUuid,
-                ],
-                [
-                    'topics' => $topics,
-                ]
-            );
+            foreach ($topics as $topic) {
+                Topic::updateOrCreate(
+                    [
+                        'user_id'     => $request->user()->id,
+                        'document_id' => $documentUuid,
+                        'content' => $topic
+                    ],
+                    [
+                        'content' => $topic
+                    ]
+                );
+            }
 
+            $topics = Document::find($documentUuid)->topics;
 
             return $this->success(['topics' => $topics]);
         } catch (AgentException $e) {
@@ -818,11 +818,13 @@ Study Material:
             throw $e; // rethrow to be caught in the calling method
         }
     }
+
+
     private function generateSummaryWithContext(
         array $content,
         string $type,
         int $maxLength,
-        array $topics = []
+        Collection $topics // pass collection of Topic models
     ): array|string {
         $contextText = '';
         $hasVisualContent = false;
@@ -841,14 +843,14 @@ Study Material:
             'visual_summary' => "Create a summary that emphasizes visual elements, charts, diagrams, and multimedia content:"
         ];
 
-        if (!empty($topics)) {
+        if ($topics && $topics->isNotEmpty()) {
             $prompt = "Summarize the following document for each topic listed.
 Return ONLY plain text summaries.
 Do not include introductions, disclaimers, or extra text.
 Output must follow this format exactly:\n\n";
 
-            foreach ($topics as $i => $topic) {
-                $prompt .= ($i + 1) . ". <summary for {$topic}>\n";
+            foreach ($topics as $topic) {
+                $prompt .= "[TOPIC_ID:{$topic->id}] <summary for {$topic->content}>\n";
             }
 
             $prompt .= "\nEach summary should be in {$type} style and under {$maxLength} characters.";
@@ -868,20 +870,29 @@ Output must follow this format exactly:\n\n";
 
         $summary = trim($response->getContent());
 
-        if (!empty($topics)) {
-            // Split into numbered parts
-            $chunks = preg_split('/\d+\.\s*/', $summary, -1, PREG_SPLIT_NO_EMPTY);
+        // Parse if topics exist
+        if ($topics && $topics->isNotEmpty()) {
+            preg_match_all('/\[TOPIC_ID:([^\]]+)\](.*?)(?=\[TOPIC_ID:|$)/s', $summary, $matches, PREG_SET_ORDER);
 
             $results = [];
-            foreach ($topics as $i => $topic) {
-                $results[$i] = trim($chunks[$i] ?? ''); // index aligned to topic_index
+            foreach ($matches as $match) {
+                $topicId = $match[1];
+                $results[$topicId] = trim($match[2]);
             }
 
-            return $results;
+            // Ensure all topics are present
+            foreach ($topics as $topic) {
+                if (!isset($results[$topic->id])) {
+                    $results[$topic->id] = ''; // fallback if missing
+                }
+            }
+
+            return $results; // keyed by topic_id
         }
 
         return $summary ?: 'Failed to generate summary';
     }
+
 
 
 

@@ -36,7 +36,7 @@ class TopicExtractorAgent extends Agent
 
             output: [
                 "Return the response in a valid JSON format.",
-                "Format: { \"topics\": [\"Topic 1\", \"Topic 2\", \"Topic 3\"] }",
+                "Format: { \"topics\": [\"Topic 1\", \"Topic 2\", \"Topic 3\", \"Topic n\"] }",
                 "Ensure topics are concise and not duplicated.",
                 "Do not include explanations, descriptions, or any text outside of the JSON."
             ],
@@ -45,9 +45,10 @@ class TopicExtractorAgent extends Agent
 
     protected function chatHistory(): FileChatHistory
     {
+        $user = request()->user()->id;
         return new FileChatHistory(
             directory: storage_path('app/public/'),
-            key: '[user-id].summary-generator',
+            key: "$user.topic-extractor",
             contextWindow: 50000
         );
     }

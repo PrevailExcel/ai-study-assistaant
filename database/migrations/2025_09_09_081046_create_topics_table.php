@@ -15,7 +15,7 @@ return new class extends Migration
             $table->uuid('id')->primary();
             $table->foreignUuid('user_id')->constrained('users');
             $table->foreignUuid('document_id')->constrained('documents');
-            $table->json('topics');
+            $table->string('content');
             $table->timestamps();
         });
     }

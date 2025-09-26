@@ -12,11 +12,7 @@ class Topic extends Model
     public $incrementing = false;
     protected $keyType = 'string';
 
-    protected $fillable = ['user_id', 'document_id', 'topics'];
-
-    protected $casts = [
-        'topics' => 'array',
-    ];
+    protected $fillable = ['user_id', 'document_id', 'content'];
 
     public function document()
     {
@@ -30,6 +26,8 @@ class Topic extends Model
 
     protected $hidden = [
         "updated_at",
-        "created_at"
+        "created_at",
+        "user_id",
+        "document_id"
     ];
 }
