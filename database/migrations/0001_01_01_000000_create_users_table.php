@@ -24,6 +24,7 @@ return new class extends Migration
             $table->string('token_id')->nullable();
             $table->string('photo')->nullable();
             $table->boolean('activated')->default(false);
+            $table->foreignUuid('current_subscription_id')->nullable()->constrained('subscriptions')->onDelete('set null');
             $table->rememberToken();
             $table->timestamps();
         });

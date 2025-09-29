@@ -3,6 +3,7 @@
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\EnhancedStudyAssistantController;
 use App\Http\Controllers\PasswordResetController;
+use App\Http\Controllers\PaystackWebhookController;
 use App\Http\Controllers\SubscriptionController;
 use App\Http\Controllers\UserDataController;
 use Illuminate\Http\Request;
@@ -27,6 +28,15 @@ Route::prefix('v1')->group(function () {
 
 
     Route::middleware('auth:sanctum')->prefix('study')->group(function () {
+
+        // Subscription management
+        Route::prefix('subscription')->group(function () {
+            Route::post('/subscribe', [SubscriptionController::class, 'subscribe']);
+            Route::post('/verify', [SubscriptionController::class, 'verify']);
+            Route::get('/current', [SubscriptionController::class, 'current']);
+            Route::post('/cancel', [SubscriptionController::class, 'cancel']);
+        });
+
 
         // File upload and processing
         Route::post('/upload', [EnhancedStudyAssistantController::class, 'uploadFile'])
@@ -83,9 +93,25 @@ Route::prefix('v1')->group(function () {
         // Study plan generation
         Route::post('/generate-study-plan', [EnhancedStudyAssistantController::class, 'generateStudyPlan'])
             ->name('study.generate-study-plan');
+
+
+        Route::middleware(['subscription:basic,premium'])->group(function () {
+            Route::get('/premium-feature', function () {
+                return response()->json(['message' => 'Premium content']);
+            });
+        });
+
+        Route::middleware(['subscription:premium'])->group(function () {
+            Route::get('/premium-only', function () {
+                return response()->json(['message' => 'Premium only content']);
+            });
+        });
     });
 });
 
 Route::get('login', function (Request $request) {
     return response()->json(['success' => false, 'message' => 'Login to access our data'], 401);
 })->name('login');
+
+Route::post('/webhook/paystack', [PaystackWebhookController::class, 'handle'])
+    ->name('paystack.webhook');

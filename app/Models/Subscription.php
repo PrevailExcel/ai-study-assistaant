@@ -13,14 +13,26 @@ class Subscription extends Model
     public $incrementing = false;
     protected $keyType = 'string';
 
+    protected $hidden = [
+        "updated_at",
+        "created_at"
+    ];
+
     protected $fillable = [
-        'user_id', 'plan_id', 'starts_at', 'ends_at', 'active'
+        'user_id',
+        'plan_id',
+        'paystack_subscription_code',
+        'paystack_email_token',
+        'status',
+        'starts_at',
+        'expires_at',
+        'cancelled_at',
     ];
 
     protected $casts = [
         'starts_at' => 'datetime',
-        'ends_at' => 'datetime',
-        'active' => 'boolean',
+        'expires_at' => 'datetime',
+        'cancelled_at' => 'datetime',
     ];
 
     public function user()
@@ -30,17 +42,39 @@ class Subscription extends Model
 
     public function plan()
     {
-        return $this->belongsTo(Plan::class);
+        return $this->belongsTo(Plan::class, 'plan_id');
     }
 
-    public function isActive()
+    public function transactions()
     {
-        return $this->is_active && now()->between($this->starts_at, $this->ends_at);
+        return $this->hasMany(SubscriptionTransaction::class);
     }
 
-    protected $hidden = [
-        "updated_at",
-        "created_at"
-    ];
+    public function isActive(): bool
+    {
+        return $this->status === 'active' &&
+            ($this->expires_at === null || $this->expires_at->isFuture());
+    }
 
+    public function isExpired(): bool
+    {
+        return $this->expires_at && $this->expires_at->isPast();
+    }
+
+    public function cancel()
+    {
+        $this->update([
+            'status' => 'cancelled',
+            'cancelled_at' => now(),
+        ]);
+    }
+
+    public function scopeActive($query)
+    {
+        return $query->where('status', 'active')
+            ->where(function ($q) {
+                $q->whereNull('expires_at')
+                    ->orWhere('expires_at', '>', now());
+            });
+    }
 }

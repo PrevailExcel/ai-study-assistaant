@@ -12,12 +12,15 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('subscriptions', function (Blueprint $table) {
-             $table->uuid('id')->primary();
+            $table->uuid('id')->primary();
             $table->foreignUuid('user_id')->constrained()->cascadeOnDelete();
             $table->foreignUuid('plan_id')->constrained()->cascadeOnDelete();
+            $table->string('paystack_subscription_code')->nullable();
+            $table->string('paystack_email_token')->nullable();
+            $table->string('status')->default('active'); // active, cancelled, expired, past_due
             $table->timestamp('starts_at')->nullable();
-            $table->timestamp('ends_at')->nullable();
-            $table->boolean('is_active')->default(true);
+            $table->timestamp('expires_at')->nullable();
+            $table->timestamp('cancelled_at')->nullable();
             $table->timestamps();
         });
     }
