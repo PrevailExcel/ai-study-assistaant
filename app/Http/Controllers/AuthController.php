@@ -33,10 +33,13 @@ class AuthController extends Controller
         Auth::login($user);
 
         $token = $user->createToken('access-token')->plainTextToken;
+
+        // add user to free plan automatically
+        $userService->assignFreePlan($user);
         $userinfo = [
             'token' => $token,
             'user' => $user->only('name', 'email', 'id', 'code'),
-            'plan' =>  $user->plan(),
+            'plan' =>  $user->subscriptionPlan() ?? 'free',
         ];
 
         // Send Email and Push notification

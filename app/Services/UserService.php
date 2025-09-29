@@ -85,4 +85,28 @@ class UserService
 
         return $user;
     }
+
+    public function assignFreePlan(User $user)
+    {
+        try {
+            $freePlan = \App\Models\Plan::where('slug', 'free')->first();
+            if ($freePlan) {
+                $subscription = new \App\Models\Subscription();
+                $subscription->user_id = $user->id;
+                $subscription->plan_id = $freePlan->id;
+                $subscription->status = 'active';
+                $subscription->starts_at = now();
+                $subscription->ends_at = null; // Free plan has no end date
+                $subscription->save();
+
+                // Update user's current_subscription_id
+                $user->current_subscription_id = $subscription->id;
+                $user->save();
+            } else {
+                Log::warning("Free plan not found. User {$user->id} was not assigned a plan.");
+            }
+        } catch (\Exception $e) {
+            Log::error("Error assigning free plan to user {$user->id}: " . $e->getMessage());
+        }
+    }
 }

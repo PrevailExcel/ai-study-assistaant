@@ -52,9 +52,4 @@ class User extends Authenticatable
             'password' => 'hashed',
         ];
     }
-
-    public function plan()
-    {
-        return "free";
-    }
 }
