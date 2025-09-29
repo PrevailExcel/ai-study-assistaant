@@ -24,7 +24,10 @@ class SubscriptionController extends Controller
             'plan_id' => 'required|exists:subscription_plans,id'
         ]);
 
-        $plan = Plan::findOrFail($request->plan_id);
+        $plan = Plan::find($request->plan_id);
+        if (!$plan || !$plan->is_active) {
+            return $this->error('Invalid plan selected', 400);
+        }
         $result = $this->subscriptionService->initializeSubscription($request->user(), $plan);
 
         return response()->json($result);
@@ -38,7 +41,7 @@ class SubscriptionController extends Controller
 
         $result = $this->subscriptionService->verifyAndActivate($request->reference);
 
-        return response()->json($result);
+        return $this->success($result);
     }
 
     public function current(Request $request)
@@ -46,10 +49,10 @@ class SubscriptionController extends Controller
         $subscription = $request->user()->currentSubscription;
 
         if (!$subscription) {
-            return response()->json(['subscription' => null]);
+            return $this->error(['subscription' => null]);
         }
 
-        return response()->json([
+        return $this->success([
             'subscription' => $subscription->load('plan')
         ]);
     }
@@ -59,12 +62,12 @@ class SubscriptionController extends Controller
         $subscription = $request->user()->currentSubscription;
 
         if (!$subscription) {
-            return response()->json(['error' => 'No active subscription'], 404);
+            return $this->error('No active subscription', 404);
         }
 
         $result = $this->subscriptionService->cancelSubscription($subscription);
 
-        return response()->json($result);
+        return $this->success($result);
     }
 
     public function listPlans()

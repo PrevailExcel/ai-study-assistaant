@@ -96,7 +96,6 @@ class UserService
                 $subscription->plan_id = $freePlan->id;
                 $subscription->status = 'active';
                 $subscription->starts_at = now();
-                $subscription->ends_at = null; // Free plan has no end date
                 $subscription->save();
 
                 // Update user's current_subscription_id

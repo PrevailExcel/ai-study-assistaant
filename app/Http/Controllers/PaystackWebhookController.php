@@ -234,7 +234,7 @@ class PaystackWebhookController extends Controller
         // Create new subscription
         $subscription = Subscription::create([
             'user_id' => $user->id,
-            'subscription_plan_id' => $plan->id,
+            'plan_id' => $plan->id,
             'paystack_subscription_code' => $subscriptionCode,
             'paystack_email_token' => $data['email_token'] ?? null,
             'status' => 'active',
