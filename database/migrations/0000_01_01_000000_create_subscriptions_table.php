@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('subscriptions', function (Blueprint $table) {
             $table->uuid('id')->primary();
-            $table->foreignUuid('user_id')->constrained()->cascadeOnDelete();
+            $table->uuid('user_id')->nullable();
             $table->foreignUuid('plan_id')->constrained()->cascadeOnDelete();
             $table->string('paystack_subscription_code')->nullable();
             $table->string('paystack_email_token')->nullable();
