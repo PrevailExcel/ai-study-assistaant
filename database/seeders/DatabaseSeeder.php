@@ -43,6 +43,7 @@ class DatabaseSeeder extends Seeder
             'slug' => 'basic',
             'interval' => 'monthly',
             'price' => 2000,
+            'paystack_plan_code' => "PLN_ktyqniw0v96tix1",
             'currency' => 'NGN',
             'duration_days' => 30,
             'features' => [
@@ -68,6 +69,7 @@ class DatabaseSeeder extends Seeder
         Plan::create([
             'name' => 'Premium Plan',
             'price' => 5000,
+            'paystack_plan_code' => "PLN_ja4mr4dwj48vudp",
             'currency' => 'NGN',
             'features' => [
                 'Unlimited document uploads per month',
