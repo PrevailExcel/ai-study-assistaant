@@ -21,7 +21,7 @@ class SubscriptionController extends Controller
     public function subscribe(Request $request)
     {
         $request->validate([
-            'plan_id' => 'required|exists:subscription_plans,id'
+            'plan_id' => 'required|exists:plans,id'
         ]);
 
         $plan = Plan::find($request->plan_id);
