@@ -369,7 +369,6 @@ class EnhancedStudyAssistantController extends Controller
         }
     }
 
-
     /**
      * Generate flashcards from document content
      */
