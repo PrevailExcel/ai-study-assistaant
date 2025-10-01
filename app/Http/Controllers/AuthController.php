@@ -86,7 +86,7 @@ class AuthController extends Controller
             $userinfo = [
                 'token' => $token,
                 'user' => $user->only('name', 'email', 'id', 'code'),
-                'plan' =>  $user->plan(),
+                'plan' =>  $user->subscriptionPlan() ?? 'free',
             ];
 
             return $this->success($userinfo, 'User registered successfully', 201);
@@ -114,7 +114,7 @@ class AuthController extends Controller
             $userinfo = [
                 'token' => $token,
                 'user' => $user->only('name', 'email', 'id', 'code'),
-                'plan' =>  $user->plan(),
+                'plan' =>  $user->subscriptionPlan() ?? 'free',
             ];
 
             return $this->success($userinfo, 'User logged in successfully');
