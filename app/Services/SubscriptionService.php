@@ -9,6 +9,7 @@ use App\Models\Plan;
 use App\Models\SubscriptionTransaction;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Log;
+
 class SubscriptionService
 {
     protected $paystack;
@@ -18,67 +19,68 @@ class SubscriptionService
         $this->paystack = $paystack;
     }
 
-public function initializeSubscription(User $user, Plan $plan)
-{
-    Log::info('Initializing subscription', [
-        'user_id' => $user->id,
-        'plan_id' => $plan->id,
-        'plan_price' => $plan->price,
-    ]);
-
-    // For free plan, directly activate
-    if ($plan->price == 0) {
-        Log::info('Activating free subscription', [
+    public function initializeSubscription(User $user, Plan $plan)
+    {
+        Log::info('Initializing subscription', [
             'user_id' => $user->id,
             'plan_id' => $plan->id,
+            'plan_price' => $plan->price,
         ]);
-        return $this->activateFreeSubscription($user, $plan);
-    }
 
-    try {
-        // Initialize Paystack transaction for paid plans
-        $payload = [
-            'email' => $user->email,
-            'amount' => $plan->price * 100, // Convert to kobo
-            'plan' => $plan->paystack_plan_code,
-            'metadata' => [
+        // For free plan, directly activate
+        if ($plan->price == 0) {
+            Log::info('Activating free subscription', [
                 'user_id' => $user->id,
                 'plan_id' => $plan->id,
-            ],
-        ];
-
-        Log::info('Sending initialize transaction request to Paystack', $payload);
-
-        $response = $this->paystack->initializeTransaction($payload);
-
-        Log::info('Paystack response received', $response);
-
-        if ($response['status']) {
-            Log::info('Paystack transaction initialized successfully', [
-                'reference' => $response['data']['reference'],
             ]);
-
-            return [
-                'success' => true,
-                'authorization_url' => $response['data']['authorization_url'],
-                'reference' => $response['data']['reference'],
-            ];
+            return $this->activateFreeSubscription($user, $plan);
         }
 
-        Log::warning('Paystack initialization failed', [
-            'response' => $response,
-        ]);
+        try {
+            // Initialize Paystack transaction for paid plans
+            $payload = [
+                'email' => $user->email,
+                'amount' => $plan->price * 100, // Convert to kobo
+                'plan' => $plan->paystack_plan_code,
+                'callback_url' => route('paystack.callback'),
+                'metadata' => [
+                    'user_id' => $user->id,
+                    'plan_id' => $plan->id,
+                ],
+            ];
 
-        return ['success' => false, 'message' => 'Failed to initialize payment'];
-    } catch (\Exception $e) {
-        Log::error('Exception during Paystack initialization', [
-            'error' => $e->getMessage(),
-            'trace' => $e->getTraceAsString(),
-        ]);
+            Log::info('Sending initialize transaction request to Paystack', $payload);
 
-        return ['success' => false, 'message' => 'An error occurred: '.$e->getMessage()];
+            $response = $this->paystack->initializeTransaction($payload);
+
+            Log::info('Paystack response received', $response);
+
+            if ($response['status']) {
+                Log::info('Paystack transaction initialized successfully', [
+                    'reference' => $response['data']['reference'],
+                ]);
+
+                return [
+                    'success' => true,
+                    'authorization_url' => $response['data']['authorization_url'],
+                    'reference' => $response['data']['reference'],
+                ];
+            }
+
+            Log::warning('Paystack initialization failed', [
+                'response' => $response,
+            ]);
+
+            return ['success' => false, 'message' => 'Failed to initialize payment'];
+        } catch (\Exception $e) {
+            Log::error('Exception during Paystack initialization', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return ['success' => false, 'message' => 'An error occurred: ' . $e->getMessage()];
+        }
     }
-}
 
     public function verifyAndActivate(string $reference)
     {

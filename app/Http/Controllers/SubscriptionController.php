@@ -8,6 +8,7 @@ use App\Services\SubscriptionService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 
 class SubscriptionController extends Controller
 {
@@ -81,4 +82,11 @@ class SubscriptionController extends Controller
             return $this->success($plans);
         });
     }
+
+    public function callback(Request $request)
+    {
+        $activate = $this->subscriptionService->verifyAndActivate($request->input('reference'));
+        return $this->success($activate);
+    }
+
 }

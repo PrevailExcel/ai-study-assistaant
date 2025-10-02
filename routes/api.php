@@ -115,3 +115,5 @@ Route::get('login', function (Request $request) {
 
 Route::post('/webhook/paystack', [PaystackWebhookController::class, 'handle'])
     ->name('paystack.webhook');
+Route::post('/callback/paystack', [SubscriptionController::class, 'callback'])
+    ->name('paystack.callback');
