@@ -95,7 +95,11 @@ class SubscriptionService
         $plan = Plan::find($metadata['plan_id']);
 
         // Cancel existing active subscriptions
-        $user->subscriptions()->active()->each->cancel();
+        $user->subscriptions()
+            ->active()
+            ->get()
+            ->each
+            ->cancel();
 
         // Create new subscription
         $subscription = Subscription::create([
@@ -128,8 +132,12 @@ class SubscriptionService
 
     public function activateFreeSubscription(User $user, Plan $plan)
     {
-        // Cancel existing subscriptions
-        $user->subscriptions()->active()->each->cancel();
+        // Cancel existing active subscriptions
+        $user->subscriptions()
+            ->active()
+            ->get()
+            ->each
+            ->cancel();
 
         $subscription = Subscription::create([
             'user_id' => $user->id,
