@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Plan;
 use App\Models\Subscription;
+use App\Models\SubscriptionTransaction;
 use App\Services\SubscriptionService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -85,7 +86,16 @@ class SubscriptionController extends Controller
 
     public function callback(Request $request)
     {
-        $activate = $this->subscriptionService->verifyAndActivate($request->input('reference'));
+$reference = $request->input('reference');
+
+        // Check if already processed
+        $existingTransaction = SubscriptionTransaction::where('paystack_reference', $reference)->first();
+        if ($existingTransaction) {
+            Log::info('Transaction already processed', ['reference' => $reference]);
+            return response()->json(['message' => 'Already processed'], 200);
+        }
+
+        $activate = $this->subscriptionService->verifyAndActivate($reference);
         return $this->success($activate);
     }
 
