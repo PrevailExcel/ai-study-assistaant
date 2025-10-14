@@ -24,6 +24,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use NeuronAI\Chat\Messages\UserMessage;
 use NeuronAI\Exceptions\AgentException;
+use Illuminate\Support\Str;
 
 class EnhancedStudyAssistantController extends Controller
 {
@@ -340,15 +341,15 @@ class EnhancedStudyAssistantController extends Controller
             );
 
             $results = [];
+            $batchId = Str::uuid();
 
             foreach ($topicList as $topic) {
-                $record = Summary::updateOrCreate(
+                $record = Summary::create(
                     [
                         'user_id'     => $request->user()->id,
                         'document_id' => $documentUuid,
                         'topic_id'    => $topic->id,
-                    ],
-                    [
+                        'batch_id'     => $batchId,
                         'content'    => $summaries[$topic->id] ?? '',
                         'type'        => $summaryType,
                         'max_length' => $maxLength,
@@ -358,7 +359,7 @@ class EnhancedStudyAssistantController extends Controller
                 $results[] = $record;
             }
 
-            return $this->success(['summaries' => $results]);
+            return $this->success(['batch_id' => $batchId, 'summaries' => $results]);
         } catch (AgentException $e) {
             return $this->error("LLM error: " . $e->getMessage(), $e->getCode());
         } catch (\Exception $e) {

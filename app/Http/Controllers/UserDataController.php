@@ -93,21 +93,34 @@ class UserDataController extends Controller
         ]);
     }
 
-    public function listSummaries(Request $request)
-    {
+public function listSummaries(Request $request)
+{
+    $perPage = (int) $request->input('per_page', 10);
+    $perPage = $perPage > 100 ? 100 : $perPage;
 
-        $perPage = (int) $request->input('per_page', 10);
-        $perPage = $perPage > 100 ? 100 : $perPage;
+    $summaries = Summary::where('user_id', $request->user()->id)
+        ->where('document_id', $request->document_id)
+        ->orderBy('created_at', 'desc')
+        ->get()
+        ->groupBy('batch_id')
+        ->values(); // reindex groups numerically
 
-        $summaries = Summary::where('user_id', request()->user()->id)
-            ->where('document_id', $request->document_id)
-            ->paginate($perPage);
+    // Paginate the grouped batches manually (since paginate() won't work with grouped data)
+    $page = (int) $request->input('page', 1);
+    $total = $summaries->count();
+    $paged = $summaries->forPage($page, $perPage)->values();
 
-        return $this->success([
-            'summaries' => $summaries->items(),
-            'pagination' => PaginationHelper::format($summaries)
-        ]);
-    }
+    return $this->success([
+        'summaries' => $paged,
+        'pagination' => [
+            'current_page' => $page,
+            'per_page' => $perPage,
+            'total' => $total,
+            'last_page' => ceil($total / $perPage)
+        ]
+    ]);
+}
+
 
     public function listFlashcards(Request $request)
     {
