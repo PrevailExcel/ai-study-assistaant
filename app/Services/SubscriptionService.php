@@ -87,6 +87,7 @@ class SubscriptionService
         $response = $this->paystack->verifyTransaction($reference);
 
         if (!$response['status'] || $response['data']['status'] !== 'success') {
+            return view('error');
             return ['success' => false, 'message' => 'Payment verification failed'];
         }
 

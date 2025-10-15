@@ -92,14 +92,11 @@ class SubscriptionController extends Controller
         $existingTransaction = SubscriptionTransaction::where('paystack_reference', $reference)->first();
         if ($existingTransaction) {
             Log::info('Transaction already processed', ['reference' => $reference]);
+            return view('processed');
             return response()->json(['message' => 'Already processed'], 200);
         }
-
         $activate = $this->subscriptionService->verifyAndActivate($reference);
-        if(!$activate['success']) {
-            Log::error('Subscription activation failed', ['reference' => $reference, 'error' => $activate['message']]);
-            return response()->json(['message' => 'Activation failed'], 400);
-        }
         return view('success');
     }
 }
+
