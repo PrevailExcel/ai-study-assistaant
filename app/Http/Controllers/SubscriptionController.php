@@ -86,7 +86,7 @@ class SubscriptionController extends Controller
 
     public function callback(Request $request)
     {
-$reference = $request->input('reference');
+        $reference = $request->input('reference');
 
         // Check if already processed
         $existingTransaction = SubscriptionTransaction::where('paystack_reference', $reference)->first();
@@ -96,7 +96,10 @@ $reference = $request->input('reference');
         }
 
         $activate = $this->subscriptionService->verifyAndActivate($reference);
-        return $this->success($activate);
+        if(!$activate['success']) {
+            Log::error('Subscription activation failed', ['reference' => $reference, 'error' => $activate['message']]);
+            return response()->json(['message' => 'Activation failed'], 400);
+        }
+        return view('success');
     }
-
 }

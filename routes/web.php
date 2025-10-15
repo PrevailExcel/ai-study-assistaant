@@ -11,6 +11,9 @@ Route::get('/', function () {
     // dd($response);
     return view('welcome');
 });
+Route::get('/success', function () {
+    return view('success');
+})->name('success');
 
 Route::get('/plans/basic', function (PaystackService $paystack) {
     $data = [

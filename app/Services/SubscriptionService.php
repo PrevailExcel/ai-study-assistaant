@@ -101,6 +101,12 @@ class SubscriptionService
             ->each
             ->cancel();
 
+            Log::info('Activating new subscription', [
+                'user_id' => $user->id,
+                'plan_id' => $plan->id,
+                'response' => $response,
+            ]);
+
         // Create new subscription
         $subscription = Subscription::create([
             'user_id' => $user->id,
