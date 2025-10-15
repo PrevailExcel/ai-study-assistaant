@@ -11,7 +11,7 @@ Route::get('/', function () {
     // dd($response);
     return view('welcome');
 });
-Route::get('/success', function () {
+Route::get('/capture', function () {
     return view('success');
 })->name('success');
 
