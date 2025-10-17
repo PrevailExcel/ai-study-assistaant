@@ -50,7 +50,7 @@ class UserDataController extends Controller
             }
 
             $documents = $query
-                ->withCount(['summaries', 'flashcards', 'questions']) // Optional for metadata
+                ->withCount(['summaries', 'flashcards', 'quizzes']) // Optional for metadata
                 ->paginate($perPage);
 
             return $this->success([
