@@ -122,7 +122,8 @@ class SubscriptionService
         ]);
 
         // Update user's current subscription
-        $user->update(['current_subscription_id' => $subscription->id]);
+        $user->current_subscription_id = $subscription->id;
+        $user->save();
 
         // Record transaction
         SubscriptionTransaction::create([
