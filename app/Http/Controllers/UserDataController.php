@@ -44,7 +44,7 @@ class UserDataController extends Controller
                         $q->orWhereHas('flashcards');
                     }
                     if (str_contains($filter, 'mcq')) {
-                        $q->orWhereHas('questions');
+                        $q->orWhereHas('quizzes');
                     }
                 });
             }
