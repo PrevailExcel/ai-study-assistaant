@@ -7,6 +7,7 @@ use App\Agents\QuestionGeneratorAgent;
 use App\Agents\SummaryGeneratorAgent;
 use App\Agents\TopicExtractorAgent;
 use App\Helpers\PaginationHelper;
+use App\Jobs\ProcessDocumentJob;
 use App\Models\Document;
 use App\Models\Flashcard;
 use App\Models\Question;
@@ -64,60 +65,37 @@ class EnhancedStudyAssistantController extends Controller
             $uploadedFile = $request->file('file');
             $fileExtension = $uploadedFile->getClientOriginalExtension();
             $fileType = $request->input('file_type', $fileExtension);
+            $fileSize = $request->file('file')->getSize();
 
             // Store the file
             $filePath = $uploadedFile->store('uploads');
             $fullPath = storage_path('app/private/' . $filePath);
 
-            // Process the file based on type
-            $processedContent = $this->fileProcessor->processFile($fullPath, $fileType);
 
-            // Generate document ID
-            $documentId = uniqid('doc_');
+            $file = $request->file('file');
+            $path = $file->store('documents', 'local');
 
-            logger()->info("📁 File uploaded and processed", [
-                'document_id' => $documentId,
-                'file_type' => $fileType,
-                'file_path' => $filePath,
-                'processed_content_summary' => $this->generateContentSummary($processedContent)
-            ]);
-
-            // Store in ChromaDB
-            $success = $this->storeInVectorDB($documentId, $processedContent, [
-                'filename' => $uploadedFile->getClientOriginalName(),
-                'file_type' => $fileType,
-                'upload_time' => now()->toISOString()
-            ]);
-
-            if (!$success) {
-                return $this->error('Failed to store processed content', 500);
-            }
-
-            // Clean up temporary files
-            $this->cleanupTempFiles();
-
-            // save in the database
             $document = Document::create([
-                'title' => $request->name ?? pathinfo($uploadedFile->getClientOriginalName(), PATHINFO_FILENAME),
-                'doc_id' => $documentId,
-                'file_path' => $filePath,
-                'file_type' => $fileType,
                 'user_id' => $request->user()->id,
+                'name' => $file->getClientOriginalName(),
+                'file_path' => $path,
+                'file_type' => $fileType,
+                'file_size' => $fileSize,
+                'status' => 'pending',
                 'metadata' => [
-                    'original_name' => $uploadedFile->getClientOriginalName(),
-                    'size' => $uploadedFile->getSize(),
-                    'mime_type' => $uploadedFile->getMimeType()
-                ]
+                    'original_name' => $file->getClientOriginalName(),
+                    'mime_type' => $file->getMimeType(),
+                    'size' => $file->getSize(),
+                ],
             ]);
+
+            ProcessDocumentJob::dispatch($document->id);
 
             return response()->json([
                 'success' => true,
-                'document_id' => $documentId,
                 'file_type' => $fileType,
-                'content_summary' => $this->generateContentSummary($processedContent),
-                'processing_stats' => $this->getProcessingStats($processedContent),
                 'document' => $document
-            ]);
+            ], 201);
         } catch (\Exception $e) {
             return response()->json([
                 'error' => 'File processing failed',
@@ -252,11 +230,11 @@ class EnhancedStudyAssistantController extends Controller
                             'question' => $quest
                         ]);
                         Question::create([
-                            'quiz_id'        => $quiz->id,
-                            'question_text'  => $quest['question'],
-                            'options'        => isset($quest['options']) ? $quest['options'] : null,
+                            'quiz_id' => $quiz->id,
+                            'question_text' => $quest['question'],
+                            'options' => isset($quest['options']) ? $quest['options'] : null,
                             'correct_answer' => $quest['correct_answer'] ?? null,
-                            'explanation'    => $quest['explanation'] ?? null,
+                            'explanation' => $quest['explanation'] ?? null,
                         ]);
                     }
                 }
@@ -284,26 +262,26 @@ class EnhancedStudyAssistantController extends Controller
     public function generateSummary(Request $request): JsonResponse
     {
         $validator = Validator::make($request->all(), [
-            'document_id'       => 'required|string',
-            'summary_type'      => 'sometimes|string|in:brief,detailed,key_points,visual_summary',
+            'document_id' => 'required|string',
+            'summary_type' => 'sometimes|string|in:brief,detailed,key_points,visual_summary',
             'include_multimedia' => 'sometimes|boolean',
             'topic_ids' => 'sometimes|array',
             'topic_ids.*' => 'exists:topics,id',
-            'max_length'        => 'sometimes|integer|min:100|max:5000'
+            'max_length' => 'sometimes|integer|min:100|max:5000'
         ]);
 
         if ($validator->fails()) {
             return response()->json([
-                'error'   => 'Validation failed',
+                'error' => 'Validation failed',
                 'details' => $validator->errors()
             ], 422);
         }
 
         try {
-            $documentId        = $request->input('document_id');
-            $summaryType       = $request->input('summary_type', 'detailed');
+            $documentId = $request->input('document_id');
+            $summaryType = $request->input('summary_type', 'detailed');
             $includeMultimedia = $request->boolean('include_multimedia', true);
-            $maxLength         = $request->input('max_length', 2000);
+            $maxLength = $request->input('max_length', 2000);
 
             // Get document UUID
             $documentUuid = Document::where('doc_id', $documentId)
@@ -346,12 +324,12 @@ class EnhancedStudyAssistantController extends Controller
             foreach ($topicList as $topic) {
                 $record = Summary::create(
                     [
-                        'user_id'     => $request->user()->id,
+                        'user_id' => $request->user()->id,
                         'document_id' => $documentUuid,
-                        'topic_id'    => $topic->id,
-                        'batch_id'     => $batchId,
-                        'content'    => $summaries[$topic->id] ?? '',
-                        'type'        => $summaryType,
+                        'topic_id' => $topic->id,
+                        'batch_id' => $batchId,
+                        'content' => $summaries[$topic->id] ?? '',
+                        'type' => $summaryType,
                         'max_length' => $maxLength,
                     ]
                 );
@@ -364,7 +342,7 @@ class EnhancedStudyAssistantController extends Controller
             return $this->error("LLM error: " . $e->getMessage(), $e->getCode());
         } catch (\Exception $e) {
             return $this->error(
-                'Summary generation failed: ' .  $e->getMessage(),
+                'Summary generation failed: ' . $e->getMessage(),
                 500
             );
         }
@@ -482,7 +460,7 @@ class EnhancedStudyAssistantController extends Controller
             foreach ($topics as $topic) {
                 Topic::updateOrCreate(
                     [
-                        'user_id'     => $request->user()->id,
+                        'user_id' => $request->user()->id,
                         'document_id' => $documentUuid,
                         'content' => $topic
                     ],
@@ -837,9 +815,9 @@ Study Material:
         }
 
         $prompts = [
-            'brief'          => "Provide a brief summary (2-3 paragraphs):",
-            'detailed'       => "Provide a comprehensive summary covering all major topics:",
-            'key_points'     => "Extract and organize the key points:",
+            'brief' => "Provide a brief summary (2-3 paragraphs):",
+            'detailed' => "Provide a comprehensive summary covering all major topics:",
+            'key_points' => "Extract and organize the key points:",
             'visual_summary' => "Create a summary that emphasizes visual elements, charts, diagrams, and multimedia content:"
         ];
 
@@ -976,15 +954,15 @@ Study Material:
                 'Content-Type' => 'application/json',
                 'anthropic-version' => '2023-06-01'
             ])->post('https://api.anthropic.com/v1/messages', [
-                'model' => 'claude-3-sonnet-20240229',
-                'max_tokens' => $maxTokens,
-                'messages' => [
-                    [
-                        'role' => 'user',
-                        'content' => $prompt
-                    ]
-                ]
-            ]);
+                        'model' => 'claude-3-sonnet-20240229',
+                        'max_tokens' => $maxTokens,
+                        'messages' => [
+                            [
+                                'role' => 'user',
+                                'content' => $prompt
+                            ]
+                        ]
+                    ]);
 
             if ($response->successful()) {
                 $content = $response->json()['content'][0]['text'];
@@ -1017,15 +995,6 @@ Study Material:
         }
 
         return $summary;
-    }
-
-    private function getProcessingStats(array $content): array
-    {
-        return [
-            'total_content_pieces' => count($content['combined_content'] ?? []),
-            'content_types' => array_keys($content),
-            'processing_time' => now()->toISOString()
-        ];
     }
 
     private function filterSearchResults(array $results, array $documentIds, array $contentTypes): array

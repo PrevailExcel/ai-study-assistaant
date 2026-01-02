@@ -23,6 +23,19 @@ Route::get('/plans/basic', function (PaystackService $paystack) {
     return response()->json($paystack->createPlan($data));
 });
 
+Route::get('send-sample-email', function () {
+    // Logic to send a sample email
+    try {
+        \Mail::raw('This is a sample email sent from the Laravel application.', function ($message) {
+            $message->to('prevailejimadu@gmail.com')
+                ->subject('Sample Email');
+        });
+        return 'Sample email sent successfully!';
+    } catch (Exception $e) {
+        return 'Failed to send email: ' . $e->getMessage();
+    }
+});
+
 Route::get('/plans/premium', function (PaystackService $paystack) {
     $data = [
         'name' => 'Premium Plan',

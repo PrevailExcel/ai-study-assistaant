@@ -12,19 +12,53 @@ class Document extends Model
     use HasUuids;
 
     protected $fillable = [
+        'user_id',
         'title',
-        'doc_id',
         'file_path',
         'file_type',
-        'user_id',
+        'file_size',
+        'status',
+        'error_message',
+        'processed_text',
         'metadata',
+        'total_chunks',
+        'error_message',
+        'processing_started_at',
+        'processing_completed_at',
     ];
 
     protected $casts = [
         'metadata' => 'array',
-        'created_at' => 'datetime:Y-m-d H:i:s',
+                'created_at' => 'datetime:Y-m-d H:i:s',
+        'processing_started_at' => 'datetime',
+        'processing_completed_at' => 'datetime',
     ];
 
+    public function embeddings()
+    {
+        return $this->hasMany(Embedding::class);
+    }
+
+    public function chunks()
+    {
+        return $this->hasMany(DocumentChunk::class);
+    }
+
+    public function isProcessing(): bool
+    {
+        return $this->status === 'processing';
+    }
+
+    public function isCompleted(): bool
+    {
+        return $this->status === 'completed' || 'processed';
+    }
+
+    public function hasFailed(): bool
+    {
+        return $this->status === 'failed';
+    }
+    
     public function getFilePathAttribute($value)
     {
         return url($value);

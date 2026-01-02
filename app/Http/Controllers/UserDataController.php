@@ -8,6 +8,7 @@ use App\Models\Flashcard;
 use App\Models\Question;
 use App\Models\Quiz;
 use App\Models\Summary;
+use App\Models\User;
 use App\Services\TtsFactory;
 use Exception;
 use Illuminate\Http\JsonResponse;
@@ -22,6 +23,16 @@ class UserDataController extends Controller
     public function listDocuments(Request $request): JsonResponse
     {
         try {
+
+            $users = User::all();
+
+            foreach ($users as $user) {
+                // This triggers a separate query for each user → N+1 problem
+                echo $user->posts->count();
+            }
+
+
+
             $perPage = (int) $request->input('per_page', 10); // default = 10
             $perPage = $perPage > 100 ? 100 : $perPage; // prevent abuse by limiting max
 
