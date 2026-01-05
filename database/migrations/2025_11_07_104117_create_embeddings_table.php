@@ -12,7 +12,7 @@ return new class extends Migration {
     {
         Schema::create('embeddings', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('document_id')->constrained()->onDelete('cascade');
+            $table->foreignUuid('document_id')->constrained()->onDelete('cascade');
             $table->longText('chunk_text');
             $table->string('vector_id');
             $table->integer('chunk_index');
