@@ -68,7 +68,7 @@ class EnhancedStudyAssistantController extends Controller
             $fileSize = $request->file('file')->getSize();
 
             // Store the file
-            $path = $uploadedFile->store('documents');
+            $path = $uploadedFile->store('documents', 'local');
 
             $document = Document::create([
                 'user_id' => $request->user()->id,

@@ -43,14 +43,14 @@ class ProcessDocumentJob implements ShouldQueue
             ]);
 
             // Validate file exists
-            if (!Storage::exists($document->file_path)) {
+            if (!Storage::disk('local')->exists($document->file_path)) {
                 throw new Exception("File not found: {$document->file_path}");
             }
 
             // Get file info
-            $filePath = Storage::path($document->file_path);
-            $mimeType = Storage::mimeType($document->file_path);
-            $fileSize = Storage::size($document->file_path);
+            $filePath = Storage::disk('local')->path($document->file_path);
+            $mimeType = Storage::disk('local')->mimeType($document->file_path);
+            $fileSize = Storage::disk('local')->size($document->file_path);
 
             // Check file size limit (50MB default)
             $maxSize = config('documents.max_file_size', 50 * 1024 * 1024);
