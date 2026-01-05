@@ -91,6 +91,11 @@ class Document extends Model
         return $this->hasMany(Question::class);
     }
 
+    public function quizzes()
+    {
+        return $this->hasMany(Quiz::class);
+    }
+
     public function flashcards()
     {
         return $this->hasMany(Flashcard::class);

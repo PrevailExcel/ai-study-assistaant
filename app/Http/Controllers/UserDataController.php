@@ -16,10 +16,6 @@ use Illuminate\Http\Request;
 
 class UserDataController extends Controller
 {
-
-    /**
-     * List documents uploaded by the user
-     */
     public function listDocuments(Request $request): JsonResponse
     {
         try {
@@ -38,19 +34,41 @@ class UserDataController extends Controller
 
             $query = Document::where('user_id', $request->user()->id);
 
+            // 🔍 Optional: Search by title or metadata
             if ($search = $request->input('search')) {
-                $query->where('title', 'like', "%{$search}%")
-                    ->orWhere('metadata->original_name', 'like', "%{$search}%")
-                    ->orWhere('metadata->mime_type', 'like', "%{$search}%");
+                $query->where(function ($q) use ($search) {
+                    $q->where('title', 'like', "%{$search}%")
+                        ->orWhere('metadata->original_name', 'like', "%{$search}%")
+                        ->orWhere('metadata->mime_type', 'like', "%{$search}%");
+                });
             }
 
-            $documents = $query->paginate($perPage);
+            // 🎯 Filter by study method (summary, flashcard, mcq)
+            if ($filter = $request->input('filter')) {
+                $filter = strtolower($filter);
+
+                $query->where(function ($q) use ($filter) {
+                    if (str_contains($filter, 'summary')) {
+                        $q->orWhereHas('summaries');
+                    }
+                    if (str_contains($filter, 'flashcard')) {
+                        $q->orWhereHas('flashcards');
+                    }
+                    if (str_contains($filter, 'mcq')) {
+                        $q->orWhereHas('quizzes');
+                    }
+                });
+            }
+
+            $documents = $query
+                ->withCount(['summaries', 'flashcards', 'quizzes']) // Optional for metadata
+                ->paginate($perPage);
 
             return $this->success([
                 'documents' => $documents->items(),
                 'pagination' => PaginationHelper::format($documents)
             ]);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             return $this->error(
                 'Failed to retrieve documents. ' . $e->getMessage(),
                 500
@@ -104,33 +122,33 @@ class UserDataController extends Controller
         ]);
     }
 
-public function listSummaries(Request $request)
-{
-    $perPage = (int) $request->input('per_page', 10);
-    $perPage = $perPage > 100 ? 100 : $perPage;
+    public function listSummaries(Request $request)
+    {
+        $perPage = (int) $request->input('per_page', 10);
+        $perPage = $perPage > 100 ? 100 : $perPage;
 
-    $summaries = Summary::where('user_id', $request->user()->id)
-        ->where('document_id', $request->document_id)
-        ->orderBy('created_at', 'desc')
-        ->get()
-        ->groupBy('batch_id')
-        ->values(); // reindex groups numerically
+        $summaries = Summary::where('user_id', $request->user()->id)
+            ->where('document_id', $request->document_id)
+            ->orderBy('created_at', 'desc')
+            ->get()
+            ->groupBy('batch_id')
+            ->values(); // reindex groups numerically
 
-    // Paginate the grouped batches manually (since paginate() won't work with grouped data)
-    $page = (int) $request->input('page', 1);
-    $total = $summaries->count();
-    $paged = $summaries->forPage($page, $perPage)->values();
+        // Paginate the grouped batches manually (since paginate() won't work with grouped data)
+        $page = (int) $request->input('page', 1);
+        $total = $summaries->count();
+        $paged = $summaries->forPage($page, $perPage)->values();
 
-    return $this->success([
-        'summaries' => $paged,
-        'pagination' => [
-            'current_page' => $page,
-            'per_page' => $perPage,
-            'total' => $total,
-            'last_page' => ceil($total / $perPage)
-        ]
-    ]);
-}
+        return $this->success([
+            'summaries' => $paged,
+            'pagination' => [
+                'current_page' => $page,
+                'per_page' => $perPage,
+                'total' => $total,
+                'last_page' => ceil($total / $perPage)
+            ]
+        ]);
+    }
 
 
     public function listFlashcards(Request $request)

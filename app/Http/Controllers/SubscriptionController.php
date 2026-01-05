@@ -86,17 +86,17 @@ class SubscriptionController extends Controller
 
     public function callback(Request $request)
     {
-$reference = $request->input('reference');
+        $reference = $request->input('reference');
 
         // Check if already processed
         $existingTransaction = SubscriptionTransaction::where('paystack_reference', $reference)->first();
         if ($existingTransaction) {
             Log::info('Transaction already processed', ['reference' => $reference]);
+            return view('processed');
             return response()->json(['message' => 'Already processed'], 200);
         }
-
         $activate = $this->subscriptionService->verifyAndActivate($reference);
-        return $this->success($activate);
+        return view('success');
     }
-
 }
+

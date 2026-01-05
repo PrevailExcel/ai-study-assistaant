@@ -87,6 +87,7 @@ class SubscriptionService
         $response = $this->paystack->verifyTransaction($reference);
 
         if (!$response['status'] || $response['data']['status'] !== 'success') {
+            return view('error');
             return ['success' => false, 'message' => 'Payment verification failed'];
         }
 
@@ -100,6 +101,12 @@ class SubscriptionService
             ->get()
             ->each
             ->cancel();
+
+            Log::info('Activating new subscription', [
+                'user_id' => $user->id,
+                'plan_id' => $plan->id,
+                'response' => $response,
+            ]);
 
         // Create new subscription
         $subscription = Subscription::create([
@@ -115,7 +122,8 @@ class SubscriptionService
         ]);
 
         // Update user's current subscription
-        $user->update(['current_subscription_id' => $subscription->id]);
+        $user->current_subscription_id = $subscription->id;
+        $user->save();
 
         // Record transaction
         SubscriptionTransaction::create([
