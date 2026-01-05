@@ -29,7 +29,7 @@ class Document extends Model
 
     protected $casts = [
         'metadata' => 'array',
-                'created_at' => 'datetime:Y-m-d H:i:s',
+        'created_at' => 'datetime:Y-m-d H:i:s',
         'processing_started_at' => 'datetime',
         'processing_completed_at' => 'datetime',
     ];
@@ -58,11 +58,11 @@ class Document extends Model
     {
         return $this->status === 'failed';
     }
-    
-    public function getFilePathAttribute($value)
-    {
-        return url($value);
-    }
+
+    // public function getFilePathAttribute($value)
+    // {
+    //     return url($value);
+    // }
 
     protected $hidden = [
         'updated_at',
