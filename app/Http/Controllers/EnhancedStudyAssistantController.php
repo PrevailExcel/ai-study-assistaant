@@ -68,24 +68,19 @@ class EnhancedStudyAssistantController extends Controller
             $fileSize = $request->file('file')->getSize();
 
             // Store the file
-            $filePath = $uploadedFile->store('uploads');
-            $fullPath = storage_path('app/private/' . $filePath);
-
-
-            $file = $request->file('file');
-            $path = $file->store('documents', 'local');
+            $path = $uploadedFile->store('documents');
 
             $document = Document::create([
                 'user_id' => $request->user()->id,
-                'name' => $file->getClientOriginalName(),
+                'name' => $uploadedFile->getClientOriginalName(),
                 'file_path' => $path,
                 'file_type' => $fileType,
                 'file_size' => $fileSize,
                 'status' => 'pending',
                 'metadata' => [
-                    'original_name' => $file->getClientOriginalName(),
-                    'mime_type' => $file->getMimeType(),
-                    'size' => $file->getSize(),
+                    'original_name' => $uploadedFile->getClientOriginalName(),
+                    'mime_type' => $uploadedFile->getMimeType(),
+                    'size' => $uploadedFile->getSize(),
                 ],
             ]);
 
