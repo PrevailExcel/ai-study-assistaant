@@ -16,12 +16,12 @@ class ProcessDocumentJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public int $documentId;
+    public $documentId;
     public int $timeout = 600; // 10 minutes for large documents with OCR
     public int $tries = 3;
     public int $maxExceptions = 2;
 
-    public function __construct(int $documentId)
+    public function __construct($documentId)
     {
         $this->documentId = $documentId;
     }
