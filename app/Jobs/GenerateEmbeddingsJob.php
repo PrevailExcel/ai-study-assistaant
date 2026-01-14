@@ -17,11 +17,11 @@ class GenerateEmbeddingsJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public int $documentId;
+    public string $documentId;
     public int $timeout = 600;
     public int $tries = 3;
 
-    public function __construct(int $documentId)
+    public function __construct(string $documentId)
     {
         $this->documentId = $documentId;
     }
