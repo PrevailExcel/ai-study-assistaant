@@ -78,7 +78,7 @@ class UserDataController extends Controller
 
     public function getDocumentDetails(Request $request, $documentId)
     {
-        $document = Document::with('topics')->where('doc_id', $documentId)
+        $document = Document::with('topics')->where('id', $documentId)
             ->where('user_id', $request->user()->id)
             ->first();
 

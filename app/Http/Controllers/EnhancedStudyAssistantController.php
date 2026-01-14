@@ -168,7 +168,7 @@ class EnhancedStudyAssistantController extends Controller
             $quiz = null;
 
 
-            $documentUuid = Document::where('doc_id', $documentId)
+            $documentUuid = Document::where('id', $documentId)
                 ->where('user_id', $request->user()->id)
                 ->value('id');
 
@@ -279,7 +279,7 @@ class EnhancedStudyAssistantController extends Controller
             $maxLength = $request->input('max_length', 2000);
 
             // Get document UUID
-            $documentUuid = Document::where('doc_id', $documentId)
+            $documentUuid = Document::where('id', $documentId)
                 ->where('user_id', $request->user()->id)
                 ->value('id');
 
@@ -368,7 +368,7 @@ class EnhancedStudyAssistantController extends Controller
             $count = $request->input('count', 10);
             $includeVisual = $request->input('include_multimedia', true);
 
-            $documentUuid = Document::where('doc_id', $documentId)
+            $documentUuid = Document::where('id', $documentId)
                 ->where('user_id', $request->user()->id)
                 ->value('id');
 
@@ -443,7 +443,7 @@ class EnhancedStudyAssistantController extends Controller
             $topics = $this->extractTopicsWithContext($allContent);
 
             // Get document uuid first
-            $documentUuid = Document::where('doc_id', $documentId)
+            $documentUuid = Document::where('id', $documentId)
                 ->where('user_id', $request->user()->id)
                 ->value('id');
 
