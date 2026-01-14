@@ -39,4 +39,14 @@ return [
         'public_key' => env('PAYSTACK_PUBLIC_KEY'),
         'secret_key' => env('PAYSTACK_SECRET_KEY'),
     ],
+
+    'openai' => [
+        'api_key' => env('OPENAI_API_KEY'),
+    ],
+    
+    'quadrant' => [
+        'url' => env('QUADRANT_API_URL', 'http://localhost:8080'),
+        'collection' => env('QUADRANT_COLLECTION', 'chatbase_vectors'),
+    ],
+
 ];
