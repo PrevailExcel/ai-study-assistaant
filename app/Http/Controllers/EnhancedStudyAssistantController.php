@@ -17,6 +17,7 @@ use App\Models\Topic;
 use App\Services\AIService;
 use App\Services\ChromaService;
 use App\Services\MultimediaFileProcessor;
+use App\Services\QuadrantService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Collection;
@@ -33,12 +34,15 @@ class EnhancedStudyAssistantController extends Controller
     private ChromaService $chromaService;
 
     private AIService $aiService;
+
+    private QuadrantService $qdrantService;
     private MultimediaFileProcessor $fileProcessor;
 
-    public function __construct(ChromaService $chromaService, AIService $aiService, MultimediaFileProcessor $fileProcessor)
+    public function __construct(ChromaService $chromaService, AIService $aiService, QuadrantService $qdrantService, MultimediaFileProcessor $fileProcessor)
     {
         $this->chromaService = $chromaService;
         $this->aiService = $aiService;
+        $this->qdrantService = $qdrantService;
         $this->fileProcessor = $fileProcessor;
 
         // Initialize ChromaDB collection
