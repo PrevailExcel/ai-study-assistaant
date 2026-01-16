@@ -22,7 +22,7 @@ Route::get('/debug/qdrant/{documentId}', function($documentId) {
     
     // Try to get points by document_id
     $results = $qdrant->search(
-        array_fill(0, 1536, 0.1), // Dummy vector
+        array_fill(0, 768, 0.1), // Dummy vector
         100,
         [
             'must' => [
