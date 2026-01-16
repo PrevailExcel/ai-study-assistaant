@@ -39,6 +39,28 @@ Route::get('/debug/qdrant/{documentId}', function($documentId) {
     ]);
 });
 
+Route::get('/debug/qdrant-config', function() {
+    $qdrant = app(App\Services\QuadrantService::class);
+    $ai = app(App\Services\AIService::class);
+    
+    // Test embedding generation
+    $testEmbedding = $ai->generateEmbedding("test");
+    
+    return response()->json([
+        'config' => [
+            'collection' => config('services.quadrant.collection'),
+            'vector_name' => config('services.quadrant.vector_name'),
+            'vector_size' => config('services.quadrant.vector_size'),
+            'embedding_provider' => config('services.ai.embedding_provider'),
+        ],
+        'test_embedding' => [
+            'dimension' => count($testEmbedding),
+            'first_5_values' => array_slice($testEmbedding, 0, 5),
+            'matches_config' => count($testEmbedding) === config('services.quadrant.vector_size')
+        ]
+    ]);
+});
+
     Route::post('/register', [AuthController::class, 'register'])
         ->name('auth.register');
     Route::post('/login-third-party', [AuthController::class, 'registerWithThirdParty'])
