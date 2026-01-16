@@ -92,8 +92,8 @@ class EnhancedStudyAssistantController extends Controller
                 ],
             ]);
 
-            ProcessDocumentJob::dispatch($document->id);
-
+            ProcessDocumentJob::dispatch($document->id)->onQueue('high');
+            
             return response()->json([
                 'success' => true,
                 'file_type' => $fileType,

@@ -105,7 +105,7 @@ class ProcessDocumentJob implements ShouldQueue
             });
 
             // Dispatch embedding generation
-            GenerateEmbeddingsJob::dispatch($document->id);
+            GenerateEmbeddingsJob::dispatch($document->id)->onQueue('embeddings');
 
             // Update final status
             $document->update([
