@@ -6,6 +6,7 @@ use App\Http\Controllers\PasswordResetController;
 use App\Http\Controllers\PaystackWebhookController;
 use App\Http\Controllers\SubscriptionController;
 use App\Http\Controllers\UserDataController;
+use App\Services\QuadrantService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
