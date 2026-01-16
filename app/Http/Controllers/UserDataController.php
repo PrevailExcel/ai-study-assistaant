@@ -19,18 +19,8 @@ class UserDataController extends Controller
     public function listDocuments(Request $request): JsonResponse
     {
         try {
-
-            $users = User::all();
-
-            foreach ($users as $user) {
-                // This triggers a separate query for each user → N+1 problem
-                echo $user->posts->count();
-            }
-
-
-
-            $perPage = (int) $request->input('per_page', 10); // default = 10
-            $perPage = $perPage > 100 ? 100 : $perPage; // prevent abuse by limiting max
+            $perPage = (int) $request->input('per_page', 10);
+            $perPage = $perPage > 100 ? 100 : $perPage; 
 
             $query = Document::where('user_id', $request->user()->id);
 
