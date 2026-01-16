@@ -14,6 +14,7 @@ use App\Models\Question;
 use App\Models\Quiz;
 use App\Models\Summary;
 use App\Models\Topic;
+use App\Services\AIService;
 use App\Services\ChromaService;
 use App\Services\MultimediaFileProcessor;
 use Illuminate\Http\Request;
@@ -30,11 +31,14 @@ use Illuminate\Support\Str;
 class EnhancedStudyAssistantController extends Controller
 {
     private ChromaService $chromaService;
+
+    private AIService $aiService;
     private MultimediaFileProcessor $fileProcessor;
 
-    public function __construct(ChromaService $chromaService, MultimediaFileProcessor $fileProcessor)
+    public function __construct(ChromaService $chromaService, AIService $aiService, MultimediaFileProcessor $fileProcessor)
     {
         $this->chromaService = $chromaService;
+        $this->aiService = $aiService;
         $this->fileProcessor = $fileProcessor;
 
         // Initialize ChromaDB collection
@@ -688,46 +692,102 @@ class EnhancedStudyAssistantController extends Controller
         return $this->chromaService->addDocuments($documents, $metadatas, $ids);
     }
 
-
-    private function getRelevantContent(string $documentId, string $topic, bool $includeVisual): array
-    {
-        // Query ChromaDB for relevant content
-        $results = $this->chromaService->queryDocuments($topic, 10);
-
-        // logger()->info("🔍 Querying ChromaDB for topic '{$topic}'", [
-        //     'document_id' => $documentId,
-        //     'include_visual' => $includeVisual,
-        //     'results_count' => isset($results['metadatas'][0]) ? count($results['metadatas'][0]) : 0,
-        //     'results' => $results
-        // ]);
-
-        // Filter by document ID and content type
-        $relevantContent = [];
-        if (isset($results['metadatas'][0])) {
-            foreach ($results['metadatas'][0] as $index => $metadata) {
-                if (isset($metadata['document_id']) && $metadata['document_id'] === $documentId) {
-                    if ($includeVisual || (isset($metadata['content_type']) && $metadata['content_type'] !== 'image_description')) {
-                        $relevantContent[] = [
-                            'content' => $results['documents'][0][$index],
-                            'metadata' => $metadata,
-                            'distance' => $results['distances'][0][$index]
-                        ];
-                    }
-                }
-            }
+private function getRelevantContent(string $documentId, string $topic, bool $includeVisual): array
+{
+    try {
+        // Generate embedding using Ollama (same as storage)
+        $queryEmbeddings = $this->aiService->ollamaBatch([$topic]);
+        
+        if (empty($queryEmbeddings) || !isset($queryEmbeddings[0])) {
+            logger()->error('Failed to generate query embedding for topic', [
+                'topic' => $topic
+            ]);
+            return [];
         }
 
+        $queryEmbedding = $queryEmbeddings[0]; // Get the first (and only) embedding
 
-        logger()->info("🔍 Relevant content retrieved", [
+        // Build filter for Qdrant
+        $filter = [
+            'must' => [
+                [
+                    'key' => 'document_id',
+                    'match' => ['value' => $documentId]
+                ]
+            ]
+        ];
+
+        // Exclude image descriptions if not including visual content
+        if (!$includeVisual) {
+            $filter['must_not'] = [
+                [
+                    'key' => 'metadata.content_type', // adjust based on your actual schema
+                    'match' => ['value' => 'image_description']
+                ]
+            ];
+        }
+
+        // Search in Qdrant
+        $results = $this->qdrantService->search(
+            $queryEmbedding,
+            15, // Get more results for better question generation
+            $filter,
+            0.5 // Score threshold - adjust based on your needs
+        );
+
+        logger()->info("🔍 Querying Qdrant for topic '{$topic}'", [
+            'document_id' => $documentId,
+            'include_visual' => $includeVisual,
+            'results_count' => count($results),
+        ]);
+
+        // Transform Qdrant results to match your expected format
+        $relevantContent = [];
+        foreach ($results as $result) {
+            $payload = $result['payload'] ?? [];
+            
+            // Get content from payload
+            $content = $payload['content'] ?? '';
+            
+            if (empty($content)) {
+                continue;
+            }
+
+            $relevantContent[] = [
+                'content' => $content,
+                'metadata' => $payload,
+                'score' => $result['score'] ?? 0,
+                'id' => $result['id'] ?? null,
+                'chunk_index' => $payload['chunk_index'] ?? null,
+            ];
+        }
+
+        // Sort by score (descending - higher is better in Qdrant)
+        usort($relevantContent, function($a, $b) {
+            return $b['score'] <=> $a['score'];
+        });
+
+        logger()->info("🔍 Relevant content retrieved from Qdrant", [
             'document_id' => $documentId,
             'topic' => $topic,
             'include_visual' => $includeVisual,
             'relevant_content_count' => count($relevantContent),
-            'relevant_content' => $relevantContent
+            'top_scores' => array_slice(array_column($relevantContent, 'score'), 0, 5),
+            'sample_content_length' => isset($relevantContent[0]) ? strlen($relevantContent[0]['content']) : 0
         ]);
 
         return $relevantContent;
+
+    } catch (\Exception $e) {
+        logger()->error('Failed to retrieve relevant content from Qdrant', [
+            'error' => $e->getMessage(),
+            'document_id' => $documentId,
+            'topic' => $topic,
+            'trace' => $e->getTraceAsString()
+        ]);
+        return [];
     }
+}
 
     private function getAllDocumentContent(string $documentId, bool $includeMultimedia): array
     {
