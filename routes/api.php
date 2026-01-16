@@ -15,6 +15,28 @@ Route::get('/user', function (Request $request) {
 
 
 Route::prefix('v1')->group(function () {
+// Add this temporary debug endpoint or artisan command
+Route::get('/debug/qdrant/{documentId}', function($documentId) {
+    $qdrant = app(QuadrantService::class);
+    
+    // Try to get points by document_id
+    $results = $qdrant->search(
+        array_fill(0, 1536, 0.1), // Dummy vector
+        100,
+        [
+            'must' => [
+                ['key' => 'document_id', 'match' => ['value' => $documentId]]
+            ]
+        ],
+        0.0
+    );
+    
+    return response()->json([
+        'document_id' => $documentId,
+        'points_found' => count($results),
+        'sample_points' => array_slice($results, 0, 3)
+    ]);
+});
 
     Route::post('/register', [AuthController::class, 'register'])
         ->name('auth.register');

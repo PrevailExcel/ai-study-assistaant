@@ -695,23 +695,34 @@ class EnhancedStudyAssistantController extends Controller
 
         return $this->chromaService->addDocuments($documents, $metadatas, $ids);
     }
-
 private function getRelevantContent(string $documentId, string $topic, bool $includeVisual): array
 {
     try {
-        // Generate embedding using Ollama (same as storage)
+        // 1. Generate embedding using Ollama
+        logger()->info("🔄 Generating embedding for topic", [
+            'topic' => $topic,
+            'document_id' => $documentId
+        ]);
+
         $queryEmbeddings = $this->aiService->ollamaBatch([$topic]);
         
         if (empty($queryEmbeddings) || !isset($queryEmbeddings[0])) {
             logger()->error('Failed to generate query embedding for topic', [
-                'topic' => $topic
+                'topic' => $topic,
+                'embeddings_result' => $queryEmbeddings
             ]);
             return [];
         }
 
-        $queryEmbedding = $queryEmbeddings[0]; // Get the first (and only) embedding
+        $queryEmbedding = $queryEmbeddings[0];
+        
+        // Log embedding details
+        logger()->info("✅ Embedding generated", [
+            'embedding_dimensions' => count($queryEmbedding),
+            'first_few_values' => array_slice($queryEmbedding, 0, 5)
+        ]);
 
-        // Build filter for Qdrant
+        // 2. Build filter for Qdrant
         $filter = [
             'must' => [
                 [
@@ -725,35 +736,60 @@ private function getRelevantContent(string $documentId, string $topic, bool $inc
         if (!$includeVisual) {
             $filter['must_not'] = [
                 [
-                    'key' => 'metadata.content_type', // adjust based on your actual schema
+                    'key' => 'metadata.content_type',
                     'match' => ['value' => 'image_description']
                 ]
             ];
         }
 
-        // Search in Qdrant
-        $results = $this->qdrantService->search(
-            $queryEmbedding,
-            15, // Get more results for better question generation
-            $filter,
-            0.5 // Score threshold - adjust based on your needs
-        );
-
-        logger()->info("🔍 Querying Qdrant for topic '{$topic}'", [
+        logger()->info("🔍 Searching Qdrant", [
             'document_id' => $documentId,
-            'include_visual' => $includeVisual,
-            'results_count' => count($results),
+            'filter' => $filter,
+            'limit' => 15,
+            'score_threshold' => 0.5
         ]);
 
-        // Transform Qdrant results to match your expected format
+        // 3. Search in Qdrant
+        $results = $this->qdrantService->search(
+            $queryEmbedding,
+            15,
+            $filter,
+            0.5 // Try lowering this to 0.3 or 0.0 to see if threshold is the issue
+        );
+
+        logger()->info("📊 Raw Qdrant results", [
+            'results_count' => count($results),
+            'raw_results' => $results // Log the full raw response
+        ]);
+
+        // 4. First, try searching WITHOUT filter to see if data exists
+        $unfilteredResults = $this->qdrantService->search(
+            $queryEmbedding,
+            15,
+            null, // No filter
+            0.0  // No threshold
+        );
+
+        logger()->info("🔓 Unfiltered search results", [
+            'unfiltered_count' => count($unfilteredResults),
+            'sample_document_ids' => array_slice(
+                array_column(array_column($unfilteredResults, 'payload'), 'document_id'),
+                0,
+                5
+            )
+        ]);
+
+        // 5. Transform Qdrant results
         $relevantContent = [];
         foreach ($results as $result) {
             $payload = $result['payload'] ?? [];
-            
-            // Get content from payload
             $content = $payload['content'] ?? '';
             
             if (empty($content)) {
+                logger()->warning("⚠️ Empty content in result", [
+                    'result_id' => $result['id'] ?? 'unknown',
+                    'payload_keys' => array_keys($payload)
+                ]);
                 continue;
             }
 
@@ -766,24 +802,24 @@ private function getRelevantContent(string $documentId, string $topic, bool $inc
             ];
         }
 
-        // Sort by score (descending - higher is better in Qdrant)
+        // Sort by score
         usort($relevantContent, function($a, $b) {
             return $b['score'] <=> $a['score'];
         });
 
-        logger()->info("🔍 Relevant content retrieved from Qdrant", [
+        logger()->info("✅ Relevant content processed", [
             'document_id' => $documentId,
             'topic' => $topic,
-            'include_visual' => $includeVisual,
+            'filtered_results' => count($results),
+            'unfiltered_results' => count($unfilteredResults),
             'relevant_content_count' => count($relevantContent),
             'top_scores' => array_slice(array_column($relevantContent, 'score'), 0, 5),
-            'sample_content_length' => isset($relevantContent[0]) ? strlen($relevantContent[0]['content']) : 0
         ]);
 
         return $relevantContent;
 
     } catch (\Exception $e) {
-        logger()->error('Failed to retrieve relevant content from Qdrant', [
+        logger()->error('❌ Failed to retrieve relevant content from Qdrant', [
             'error' => $e->getMessage(),
             'document_id' => $documentId,
             'topic' => $topic,
@@ -792,7 +828,6 @@ private function getRelevantContent(string $documentId, string $topic, bool $inc
         return [];
     }
 }
-
     private function getAllDocumentContent(string $documentId, bool $includeMultimedia): array
     {
         // Get all content for a specific document
