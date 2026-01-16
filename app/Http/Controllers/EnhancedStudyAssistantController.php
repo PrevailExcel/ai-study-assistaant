@@ -754,7 +754,7 @@ class EnhancedStudyAssistantController extends Controller
                 $queryEmbedding,
                 15,
                 $filter,
-                0.5 // Try lowering this to 0.3 or 0.0 to see if threshold is the issue
+                0.3 // Try lowering this to 0.3 or 0.0 to see if threshold is the issue
             );
 
             logger()->info("📊 Raw Qdrant results", [
@@ -781,7 +781,7 @@ class EnhancedStudyAssistantController extends Controller
 
             // 5. Transform Qdrant results
             $relevantContent = [];
-            foreach ($results as $result) {
+            foreach ($unfilteredResults as $result) {
                 $payload = $result['payload'] ?? [];
                 $content = $payload['content'] ?? '';
 

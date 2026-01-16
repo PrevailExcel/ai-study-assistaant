@@ -47,6 +47,7 @@ return [
     'quadrant' => [
         'url' => env('QUADRANT_API_URL', 'http://localhost:8080'),
         'collection' => env('QUADRANT_COLLECTION', 'chatbase_vectors'),
+        'vector_size' => env('QUADRANT_VECTOR_SIZE', 768),
     ],
 
 ];

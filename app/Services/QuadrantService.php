@@ -19,7 +19,7 @@ class QuadrantService
         $this->baseUrl = config('services.quadrant.url');
         $this->apiKey = config('qdrant.api_key');
         $this->collectionName = config('services.quadrant.collection', 'chatbase_vectors');
-        $this->vectorSize = config('qdrant.vector_size', 768); // Nombix embedding size
+        $this->vectorSize = config('services.quadrant.vector_size', 768); // Nombix embedding size
         $this->vectorName = 'nombix'; // Named vector for Qdrant >=1.2
     }
 
