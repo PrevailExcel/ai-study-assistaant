@@ -25,6 +25,11 @@ composer require thiagoalessio/tesseract_ocr
 ## For OCR
 sudo apt install tesseract-ocr
 
+pip install ocrmypdf (for latest version)
+or
+sudo apt install ocrmypdf
+
+
 ## For PDF
 sudo apt install poppler-utils
 

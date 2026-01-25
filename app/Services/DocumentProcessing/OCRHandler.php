@@ -2,21 +2,15 @@
 
 namespace App\Services\DocumentProcessing;
 
-use Illuminate\Support\Facades\{Storage, Log};
+use Illuminate\Support\Facades\Log;
 use Exception;
 
-
-/**
- * OCR Handler using Tesseract
- */
 class OCRHandler
 {
-    private string $tesseractPath;
     private string $tempDir;
 
     public function __construct()
     {
-        $this->tesseractPath = env('TESSERACT_PATH', '/usr/bin/tesseract');
         $this->tempDir = storage_path('app/temp/ocr');
 
         if (!is_dir($this->tempDir)) {
@@ -24,34 +18,111 @@ class OCRHandler
         }
     }
 
+    /**
+     * Main method to process a PDF and return its extracted text.
+     */
     public function processPdf(string $pdfPath): string
     {
-        // Check if required tools are installed
-        if (!$this->checkDependencies()) {
-            throw new Exception(
-                "OCR dependencies not installed. Please install:\n" .
-                "- Tesseract OCR: apt-get install tesseract-ocr\n" .
-                "- Poppler utils: apt-get install poppler-utils"
-            );
+        // Generate temporary OCR output PDF
+        $outputPdf = $this->tempDir . '/' . uniqid('ocr_') . '.pdf';
+
+        try {
+            // Try OCRmyPDF first
+            $this->runOcrmypdf($pdfPath, $outputPdf);
+
+            // Extract text from the OCR'd PDF
+            $text = $this->extractTextFromPdf($outputPdf);
+
+            return $text ?: '';
+        } catch (Exception $e) {
+            Log::warning("OCRmyPDF failed, falling back to Tesseract: " . $e->getMessage());
+
+            // Fallback: manual page-by-page Tesseract OCR
+            return $this->fallbackTesseract($pdfPath);
+        } finally {
+            // Cleanup temp OCR PDF
+            if (file_exists($outputPdf)) {
+                unlink($outputPdf);
+            }
+        }
+    }
+
+    /**
+     * Run OCRmyPDF on the given PDF.
+     */
+    private function runOcrmypdf(string $inputPdf, string $outputPdf): void
+    {
+        $command = sprintf(
+            'ocrmypdf -l eng --force-ocr --deskew --remove-background %s %s 2>&1',
+            escapeshellarg($inputPdf),
+            escapeshellarg($outputPdf)
+        );
+
+        $output = [];
+        $returnCode = 0;
+        exec($command, $output, $returnCode);
+
+        Log::debug('OCRmyPDF command executed', [
+            'command' => $command,
+            'return_code' => $returnCode,
+            'output' => $output,
+        ]);
+
+        if ($returnCode !== 0 || !file_exists($outputPdf)) {
+            throw new Exception("OCRmyPDF failed:\n" . implode("\n", $output));
+        }
+    }
+
+    /**
+     * Extract text from PDF using pdftotext.
+     */
+    private function extractTextFromPdf(string $pdfPath): string
+    {
+        $text = shell_exec("pdftotext " . escapeshellarg($pdfPath) . " -");
+        return $text ?: '';
+    }
+
+    /**
+     * Fallback OCR using manual Tesseract per page.
+     */
+    private function fallbackTesseract(string $pdfPath): string
+    {
+        // Convert PDF pages to images using pdftoppm
+        $outputPrefix = $this->tempDir . '/' . uniqid('pdf_page_');
+
+        $command = sprintf(
+            'pdftoppm -png -r 300 %s %s 2>&1',
+            escapeshellarg($pdfPath),
+            escapeshellarg($outputPrefix)
+        );
+
+        $output = [];
+        $returnCode = 0;
+        exec($command, $output, $returnCode);
+
+        Log::debug('pdftoppm command', [
+            'command' => $command,
+            'return_code' => $returnCode,
+            'output' => $output,
+        ]);
+
+        if ($returnCode !== 0) {
+            throw new Exception("Failed to convert PDF to images:\n" . implode("\n", $output));
         }
 
-        // Convert PDF pages to images
-        $imageFiles = $this->pdfToImages($pdfPath);
+        $images = glob($outputPrefix . '-*.png');
+        sort($images);
 
         $fullText = '';
 
-        foreach ($imageFiles as $pageNum => $imagePath) {
-            Log::info("OCR processing page " . ($pageNum + 1));
-
+        foreach ($images as $pageNum => $imagePath) {
+            $fullText .= "\n\n--- PAGE " . ($pageNum + 1) . " (OCR fallback) ---\n\n";
             try {
-                $pageText = $this->ocrImage($imagePath);
-                $fullText .= "\n\n--- PAGE " . ($pageNum + 1) . " (OCR) ---\n\n";
-                $fullText .= $pageText;
+                $fullText .= $this->ocrImage($imagePath);
             } catch (Exception $e) {
-                Log::warning("OCR failed for page " . ($pageNum + 1) . ": " . $e->getMessage());
-                $fullText .= "\n\n[Page " . ($pageNum + 1) . " - OCR failed]\n\n";
+                Log::warning("Tesseract fallback failed for page " . ($pageNum + 1) . ": " . $e->getMessage());
+                $fullText .= "[Page " . ($pageNum + 1) . " - OCR failed]\n";
             } finally {
-                // Clean up image file
                 if (file_exists($imagePath)) {
                     unlink($imagePath);
                 }
@@ -61,49 +132,32 @@ class OCRHandler
         return $fullText;
     }
 
-    private function pdfToImages(string $pdfPath): array
-    {
-        $outputPrefix = $this->tempDir . '/' . uniqid('pdf_page_');
-
-        // Use pdftoppm to convert PDF to images
-        $command = sprintf(
-            'pdftoppm -png -r 300 %s %s',
-            escapeshellarg($pdfPath),
-            escapeshellarg($outputPrefix)
-        );
-
-        exec($command, $output, $returnCode);
-
-        if ($returnCode !== 0) {
-            throw new Exception("Failed to convert PDF to images");
-        }
-
-        // Find all generated images
-        $images = glob($outputPrefix . '-*.png');
-        sort($images);
-
-        return $images;
-    }
-
+    /**
+     * Run Tesseract OCR on a single image.
+     */
     private function ocrImage(string $imagePath): string
     {
         $outputBase = $this->tempDir . '/' . uniqid('ocr_');
-
         $command = sprintf(
-            '%s %s %s -l eng 2>&1',
-            escapeshellarg($this->tesseractPath),
+            'tesseract %s %s -l eng 2>&1',
             escapeshellarg($imagePath),
             escapeshellarg($outputBase)
         );
 
+        $output = [];
+        $returnCode = 0;
         exec($command, $output, $returnCode);
 
         $outputFile = $outputBase . '.txt';
 
+        Log::debug('Tesseract command', [
+            'command' => $command,
+            'return_code' => $returnCode,
+            'output' => $output,
+        ]);
+
         if ($returnCode !== 0 || !file_exists($outputFile)) {
-            throw new Exception(
-                "Tesseract OCR failed. Output: " . implode("\n", $output)
-            );
+            throw new Exception("Tesseract OCR failed:\n" . implode("\n", $output));
         }
 
         $text = file_get_contents($outputFile);
@@ -111,15 +165,4 @@ class OCRHandler
 
         return $text;
     }
-
-
-    private function checkDependencies(): bool
-    {
-        $tesseractExists = file_exists($this->tesseractPath) ||
-            !empty(shell_exec('which tesseract 2>/dev/null'));
-        $popplerExists = !empty(shell_exec('which pdftoppm 2>/dev/null'));
-
-        return $tesseractExists && $popplerExists;
-    }
 }
-
